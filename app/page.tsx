@@ -1,101 +1,105 @@
-import Image from "next/image";
+//app/index.tsx
 
-export default function Home() {
+import React from "react";
+import Link from "next/link";
+import { FiBookOpen, FiEdit, FiShare2 } from "react-icons/fi";
+import { SignedOut, SignInButton, SignedIn, UserButton } from "@clerk/nextjs";
+
+type FeatureCardProps = {
+  icon: React.ReactNode; // Assuming 'icon' is a JSX element or React component
+  title: string;
+  description: string;
+};
+
+export default function Note() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="container mx-auto px-4 py-16">
+        <h1 className="text-5xl font-extrabold text-center mb-8 text-indigo-800">
+          Welcome to Your Digital Note-Taking App
+        </h1>
+        <p className="text-xl text-center mb-12 text-gray-700 max-w-2xl mx-auto">
+          Organize your thoughts, capture ideas, and boost your productivity
+          with our powerful and intuitive note-taking tools.
+        </p>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        <div className="flex justify-center mb-12">
+          <Link
+            href="/notes"
+            className="bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-indigo-700 transition duration-300 text-lg"
           >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            Get Started
+          </Link>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+
+        <div className="grid md:grid-cols-3 gap-8 mb-16">
+          <FeatureCard
+            icon={<FiBookOpen className="w-10 h-10" />}
+            title="Organize Effortlessly"
+            description="Create folders, add tags, and easily categorize your notes for quick access."
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+          <FeatureCard
+            icon={<FiEdit className="w-10 h-10" />}
+            title="Rich Text Editing"
+            description="Format your notes with our powerful editor, supporting markdown and multimedia."
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
+          <FeatureCard
+            icon={<FiShare2 className="w-10 h-10" />}
+            title="Collaborate Seamlessly"
+            description="Share notes with team members and collaborate in real-time."
           />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        </div>
+
+        <div className="text-center">
+          <h2 className="text-3xl font-bold mb-4 text-indigo-800">
+            Ready to transform your note-taking?
+          </h2>
+          <p className="text-lg text-gray-700 mb-6">
+            Join thousands of users who have improved their productivity with
+            our app.
+          </p>
+          <Link
+            href="/signup"
+            className="bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition duration-300"
+          >
+            Sign up for Free
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
+
+function FeatureCard({ icon, title, description }: FeatureCardProps) {
+  return (
+    <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition duration-300">
+      <div className="text-indigo-600 mb-4">{icon}</div>
+      <h3 className="text-xl font-semibold mb-2">{title}</h3>
+      <p className="text-gray-600">{description}</p>
+    </div>
+  );
+}
+
+
+
+
+// // pages/index.tsx
+// import type { NextPage } from "next";
+// import Link from "next/link";
+
+// const Home: NextPage = () => {
+//   return (
+//     <div className="flex flex-col items-center justify-center min-h-screen py-2">
+//       <h1 className="text-4xl font-bold mb-4">
+//         Welcome to Your Note-Taking App
+//       </h1>
+//       <Link href="/notes" legacyBehavior>
+//         <a className="bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition duration-300">
+//           My Notes {/* Change "View Notes" to any text you prefer */}
+//         </a>
+//       </Link>
+//     </div>
+//   );
+// };
+
+// export default Home;
