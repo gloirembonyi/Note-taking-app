@@ -1,11 +1,10 @@
 // app/layout.tsx
 import { ClerkProvider } from '@clerk/nextjs';
-import Layout from '@/components/Layout';
 import '../styles/globals.css';
 
 export const metadata = {
-  title: 'Digital Note Taking',
-  description: 'A Next.js-powered digital note-taking application',
+  title: 'NoteGenius - AI-Powered Note Taking',
+  description: 'Transform your ideas into organized, beautifully formatted notes with our AI assistant',
 };
 
 export default function RootLayout({
@@ -17,7 +16,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body>
-          <Layout>{children}</Layout>
+          {children}
         </body>
       </html>
     </ClerkProvider>

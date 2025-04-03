@@ -1,105 +1,177 @@
-//app/index.tsx
+'use client';
 
-import React from "react";
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
 import Link from "next/link";
-import { FiBookOpen, FiEdit, FiShare2 } from "react-icons/fi";
-import { SignedOut, SignInButton, SignedIn, UserButton } from "@clerk/nextjs";
+import { 
+  BrainCircuit, 
+  FileText, 
+  Mic,
+  Sparkles, 
+  Clock, 
+  Layers,
+  Video,
+  MessageSquare,
+  LucideIcon,
+  ArrowRight
+} from "lucide-react";
+import { SignedOut, SignedIn, UserButton } from "@clerk/nextjs";
 
-type FeatureCardProps = {
-  icon: React.ReactNode; // Assuming 'icon' is a JSX element or React component
+// Feature card component for the landing page
+interface FeatureCardProps {
   title: string;
   description: string;
-};
-
-export default function Note() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-16">
-        <h1 className="text-5xl font-extrabold text-center mb-8 text-indigo-800">
-          Welcome to Your Digital Note-Taking App
-        </h1>
-        <p className="text-xl text-center mb-12 text-gray-700 max-w-2xl mx-auto">
-          Organize your thoughts, capture ideas, and boost your productivity
-          with our powerful and intuitive note-taking tools.
-        </p>
-
-        <div className="flex justify-center mb-12">
-          <Link
-            href="/notes"
-            className="bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-indigo-700 transition duration-300 text-lg"
-          >
-            Get Started
-          </Link>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8 mb-16">
-          <FeatureCard
-            icon={<FiBookOpen className="w-10 h-10" />}
-            title="Organize Effortlessly"
-            description="Create folders, add tags, and easily categorize your notes for quick access."
-          />
-          <FeatureCard
-            icon={<FiEdit className="w-10 h-10" />}
-            title="Rich Text Editing"
-            description="Format your notes with our powerful editor, supporting markdown and multimedia."
-          />
-          <FeatureCard
-            icon={<FiShare2 className="w-10 h-10" />}
-            title="Collaborate Seamlessly"
-            description="Share notes with team members and collaborate in real-time."
-          />
-        </div>
-
-        <div className="text-center">
-          <h2 className="text-3xl font-bold mb-4 text-indigo-800">
-            Ready to transform your note-taking?
-          </h2>
-          <p className="text-lg text-gray-700 mb-6">
-            Join thousands of users who have improved their productivity with
-            our app.
-          </p>
-          <Link
-            href="/signup"
-            className="bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition duration-300"
-          >
-            Sign up for Free
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
+  icon: LucideIcon;
 }
 
-function FeatureCard({ icon, title, description }: FeatureCardProps) {
+function FeatureCard({ title, description, icon: Icon }: FeatureCardProps) {
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition duration-300">
-      <div className="text-indigo-600 mb-4">{icon}</div>
-      <h3 className="text-xl font-semibold mb-2">{title}</h3>
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+      <div className="bg-indigo-50 w-12 h-12 rounded-lg flex items-center justify-center text-indigo-600 mb-4">
+        <Icon size={24} />
+      </div>
+      <h3 className="text-lg font-medium text-gray-900 mb-2">{title}</h3>
       <p className="text-gray-600">{description}</p>
     </div>
   );
 }
 
+export default function HomePage() {
+  const router = useRouter();
+  const { isSignedIn, isLoaded } = useUser();
 
+  useEffect(() => {
+    // Redirect to notes page if the user is signed in
+    if (isLoaded && isSignedIn) {
+      router.push('/notes');
+    }
+  }, [isSignedIn, isLoaded, router]);
 
+  return (
+    <div className="min-h-screen flex flex-col">
+      {/* Hero Header */}
+      <header className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+        <div className="container mx-auto px-4 py-8 flex justify-between items-center">
+          <div className="flex items-center">
+            <BrainCircuit size={32} className="mr-2" />
+            <h1 className="text-2xl font-bold">NoteGenius</h1>
+          </div>
+          
+          <div>
+            <SignedOut>
+              <div className="space-x-4">
+                <Link href="/sign-in" className="text-white hover:text-indigo-100">
+                  Sign In
+                </Link>
+                <Link href="/sign-up" className="bg-white text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors">
+                  Sign Up
+                </Link>
+              </div>
+            </SignedOut>
+            
+            <SignedIn>
+              <div className="flex items-center space-x-4">
+                <Link href="/notes" className="text-white hover:text-indigo-100">
+                  My Notes
+                </Link>
+                <UserButton afterSignOutUrl="/" />
+              </div>
+            </SignedIn>
+          </div>
+        </div>
+        
+        <div className="container mx-auto px-4 py-20 flex flex-col items-center text-center">
+          <h2 className="text-4xl md:text-5xl font-bold mb-6">
+            AI-Powered Note Taking for<br />Modern Professionals
+          </h2>
+          <p className="text-xl mb-8 max-w-2xl">
+            Capture, organize, and enhance your ideas with the power of AI.
+            Transform your notes with intelligent suggestions and real-time collaboration.
+          </p>
+          
+          <div className="flex flex-wrap gap-4 justify-center">
+            <Link href="/sign-up" className="bg-white text-indigo-600 px-6 py-3 rounded-lg font-medium hover:bg-indigo-50 transition-colors flex items-center">
+              Get Started
+              <ArrowRight size={16} className="ml-2" />
+            </Link>
+            
+            <SignedIn>
+              <Link href="/notes" className="bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-800 transition-colors">
+                Go to My Notes
+              </Link>
+            </SignedIn>
+          </div>
+        </div>
+      </header>
+      
+      {/* Features Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-12">Supercharge Your Note-Taking</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <FeatureCard 
+              title="AI-Powered Suggestions" 
+              description="Get real-time suggestions and formatting help as you type, making your notes clearer and more organized."
+              icon={Sparkles}
+            />
+            
+            <FeatureCard 
+              title="Speech-to-Text" 
+              description="Record meetings or ideas on the go with high-quality transcription that identifies speakers and key topics."
+              icon={Mic}
+            />
+            
+            <FeatureCard 
+              title="Real-Time Collaboration" 
+              description="Work on notes simultaneously with teammates, seeing their edits and cursor positions in real-time."
+              icon={MessageSquare}
+            />
+            
+            <FeatureCard 
+              title="Smart Organization" 
+              description="Automatically categorize and tag your notes for easy retrieval when you need them most."
+              icon={Layers}
+            />
+            
+            <FeatureCard 
+              title="Meeting Enhancement" 
+              description="Transform messy meeting transcripts into structured notes with action items automatically highlighted."
+              icon={Video}
+            />
+            
+            <FeatureCard 
+              title="Revision History" 
+              description="Track changes and revert to previous versions at any time, ensuring you never lose important information."
+              icon={Clock}
+            />
+          </div>
+        </div>
+      </section>
+      
+      {/* CTA Section */}
+      <section className="py-16 bg-indigo-600 text-white">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl font-bold mb-6">Ready to Transform Your Notes?</h2>
+          <p className="text-xl mb-8 max-w-2xl mx-auto">
+            Join thousands of professionals who are saving time and enhancing their productivity with NoteGenius.
+          </p>
+          
+          <SignedOut>
+            <Link href="/sign-up" className="bg-white text-indigo-600 px-8 py-3 rounded-lg font-medium hover:bg-indigo-50 transition-colors inline-block">
+              Create Your Free Account
+            </Link>
+          </SignedOut>
+          
+          <SignedIn>
+            <Link href="/notes" className="bg-white text-indigo-600 px-8 py-3 rounded-lg font-medium hover:bg-indigo-50 transition-colors inline-block">
+              Go to My Notes
+            </Link>
+          </SignedIn>
+        </div>
+      </section>
+    </div>
+  );
+}
 
-// // pages/index.tsx
-// import type { NextPage } from "next";
-// import Link from "next/link";
-
-// const Home: NextPage = () => {
-//   return (
-//     <div className="flex flex-col items-center justify-center min-h-screen py-2">
-//       <h1 className="text-4xl font-bold mb-4">
-//         Welcome to Your Note-Taking App
-//       </h1>
-//       <Link href="/notes" legacyBehavior>
-//         <a className="bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition duration-300">
-//           My Notes {/* Change "View Notes" to any text you prefer */}
-//         </a>
-//       </Link>
-//     </div>
-//   );
-// };
-
-// export default Home;

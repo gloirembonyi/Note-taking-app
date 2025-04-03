@@ -127,5 +127,4 @@ export const createFolder = async (folder: Omit<Folder, 'id'>): Promise<Folder> 
   }
   return response.json();
 };
-
 // You can add more API functions here as needed
