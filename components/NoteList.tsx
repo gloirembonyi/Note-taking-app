@@ -112,7 +112,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
               </div>
               <Link href={`/notes/${note.id}`}>
                 <p className="text-gray-600 text-sm mb-3">{getContentPreview(note.content)}</p>
-              </Link>
+</Link>
               <div className="flex justify-between items-center text-xs text-gray-500">
                 <div className="flex items-center">
                   <Clock className="w-3 h-3 mr-1" />

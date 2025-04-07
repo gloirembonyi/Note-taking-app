@@ -13,6 +13,16 @@ interface AdvancedEditorProps {
   user?: { id: string; name?: string };
 }
 
+// Related image type
+interface RelatedImage {
+  src: string;
+  thumbnail: string;
+  title: string;
+  context: string;
+  width?: number;
+  height?: number;
+}
+
 export default function AdvancedEditor({
   initialContent = '',
   onContentChange,
@@ -38,14 +48,7 @@ export default function AdvancedEditor({
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   
   // Related content state
-  const [relatedImages, setRelatedImages] = useState<Array<{
-    src: string;
-    title: string;
-    thumbnail: string;
-    context: string;
-    width: number;
-    height: number;
-  }>>([]);
+  const [relatedImages, setRelatedImages] = useState<RelatedImage[]>([]);
   const [showRelatedImages, setShowRelatedImages] = useState(false);
   const [isLoadingImages, setIsLoadingImages] = useState(false);
   const [relatedTopics, setRelatedTopics] = useState<string[]>([]);
@@ -494,35 +497,106 @@ export default function AdvancedEditor({
 
   // Get related images based on content
   const getRelatedImages = async () => {
-    if (content.length < 20) {
-      setSystemMessage('Please write more content to find related images');
-      return;
-    }
-    
     setIsLoadingImages(true);
-    setShowRelatedImages(true);
+    setSystemMessage('');
     
     try {
-      // Extract main topic from content
-      const firstParagraph = content.split('\n')[0].trim();
-      const topic = firstParagraph.length > 10 ? firstParagraph : content.substring(0, 100);
+      // Check if there's enough content to extract meaningful search terms
+      if (content.trim().length < 20) {
+        setSystemMessage('Please write more content to find relevant images');
+        setIsLoadingImages(false);
+        return;
+      }
       
-      const response = await fetch(`/api/related-images?query=${encodeURIComponent(topic)}`);
+      // Extract the topic from headings or first paragraph
+      let topic = '';
+      
+      // Try to get the first heading
+      const headingMatch = content.match(/#{1,6}\s+(.+)$/m);
+      if (headingMatch && headingMatch[1]) {
+        topic = headingMatch[1].trim();
+      } else {
+        // Try to get the first paragraph
+        const paragraphs = content.split('\n\n');
+        for (const para of paragraphs) {
+          const cleanPara = para.trim();
+          if (cleanPara.length > 15) {
+            topic = cleanPara.substring(0, 100);
+            break;
+          }
+        }
+      }
+      
+      // If we still don't have a topic, take the first 100 chars of content
+      if (!topic) {
+        topic = content.trim().substring(0, 100);
+      }
+      
+      // Clean the topic - remove markdown syntax and limit length
+      topic = topic.replace(/[#*_~`>]/g, '').trim();
+      
+      if (topic.length < 3) {
+        setSystemMessage('Cannot determine a good search topic from your content');
+        setIsLoadingImages(false);
+        
+        // Set placeholder images
+        setRelatedImages([
+          { 
+            src: 'https://via.placeholder.com/400/e2e8f0/64748b?text=Add+more+content', 
+            thumbnail: 'https://via.placeholder.com/150/e2e8f0/64748b?text=Add+more+content',
+            title: 'Add more specific content to search',
+            context: '#',
+            width: 400,
+            height: 300
+          },
+          { 
+            src: 'https://via.placeholder.com/400/e2e8f0/64748b?text=Try+adding+headings', 
+            thumbnail: 'https://via.placeholder.com/150/e2e8f0/64748b?text=Try+adding+headings',
+            title: 'Add headings to improve search results',
+            context: '#',
+            width: 400,
+            height: 300
+          }
+        ]);
+        return;
+      }
+      
+      console.log('Searching for images related to:', topic);
+      const response = await fetch(`/api/related-images?q=${encodeURIComponent(topic)}`);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch related images');
+        throw new Error(`Error fetching images: ${response.statusText}`);
       }
       
       const data = await response.json();
-      if (data.images && Array.isArray(data.images)) {
-        setRelatedImages(data.images);
-        setSystemMessage(`Found ${data.images.length} related images`);
-      } else {
-        setSystemMessage('No related images found');
+      setRelatedImages(data);
+      
+      if (data.length === 0) {
+        setSystemMessage('No related images found for this topic');
       }
     } catch (error) {
       console.error('Error fetching related images:', error);
-      setSystemMessage('Failed to get related images. Please try again.');
+      setSystemMessage(`Error finding related images: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Set placeholder images in case of error
+      setRelatedImages([
+        { 
+          src: 'https://via.placeholder.com/400/f8fafc/64748b?text=Search+Error', 
+          thumbnail: 'https://via.placeholder.com/150/f8fafc/64748b?text=Search+Error',
+          title: 'Error loading images',
+          context: '#',
+          width: 400,
+          height: 300
+        },
+        { 
+          src: 'https://via.placeholder.com/400/f8fafc/64748b?text=Try+Again', 
+          thumbnail: 'https://via.placeholder.com/150/f8fafc/64748b?text=Try+Again',
+          title: 'Please try searching again',
+          context: '#',
+          width: 400,
+          height: 300
+        }
+      ]);
     } finally {
       setIsLoadingImages(false);
     }
@@ -703,40 +777,33 @@ export default function AdvancedEditor({
     }, 100);
   };
 
-  // Handle keyboard shortcuts
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Check for Ctrl+/ to toggle AI chat
-    if (e.ctrlKey && e.key === '/') {
-      e.preventDefault();
-      toggleAIChat();
-    }
-    
-    // Check for Alt+R to find related images
-    if (e.altKey && e.key === 'r') {
-      e.preventDefault();
-      getRelatedImages();
-    }
-    
-    // Check for Alt+T to find related topics
-    if (e.altKey && e.key === 't') {
-      e.preventDefault();
-      generateRelatedTopics();
-    }
-    
-    // In AI chat: Enter to send, Escape to close
-    if (showAIChat) {
-      if (e.key === 'Enter' && !e.shiftKey && document.activeElement === chatInputRef.current) {
+  // Handle keyboard shortcuts and set up window event listeners
+  useEffect(() => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      // Alt+A or Option+A for AI assistant
+      if ((e.altKey || e.metaKey) && e.key === 'a') {
         e.preventDefault();
-        sendQuestionToAI();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        setShowAIChat(false);
+        setShowAIChat(!showAIChat);
       }
-    }
-  };
+      
+      // Alt+R or Option+R for related images
+      if ((e.altKey || e.metaKey) && e.key === 'r') {
+        e.preventDefault();
+        if (showRelatedImages) {
+          getRelatedImages();
+        } else {
+          setShowRelatedImages(true);
+          setTimeout(() => getRelatedImages(), 100);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showAIChat, showRelatedImages, getRelatedImages]);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden border border-gray-200 rounded-lg" onKeyDown={handleKeyDown}>
+    <div className="flex flex-col h-full overflow-hidden border border-gray-200 rounded-lg">
       {/* Toolbar */}
       <div className="flex items-center p-2 border-b border-gray-200 bg-gray-50">
         <div className="flex space-x-1">
@@ -901,261 +968,76 @@ export default function AdvancedEditor({
           {/* Related images panel */}
           {showRelatedImages && (
             <div className="w-1/4 min-w-[250px] border-l border-gray-200 p-3 overflow-y-auto">
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex justify-between items-center mb-3">
                 <h3 className="font-medium text-gray-700">Related Images</h3>
-                <button 
-                  onClick={() => setShowRelatedImages(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X size={16} />
-                </button>
+                <div className="flex space-x-1">
+                  <button 
+                    onClick={getRelatedImages}
+                    className="text-indigo-500 hover:text-indigo-700 p-1 rounded hover:bg-gray-100"
+                    title="Refresh images"
+                    disabled={isLoadingImages}
+                  >
+                    {isLoadingImages ? 
+                      <Loader2 size={16} className="animate-spin" /> : 
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                    }
+                  </button>
+                  <button 
+                    onClick={() => setShowRelatedImages(false)}
+                    className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-100"
+                    title="Close panel"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
               
               {isLoadingImages ? (
-                <div className="flex justify-center items-center h-40">
-                  <Loader2 size={24} className="animate-spin text-indigo-500" />
+                <div className="flex flex-col justify-center items-center h-40">
+                  <Loader2 size={24} className="animate-spin text-indigo-500 mb-2" />
+                  <p className="text-sm text-gray-500">Searching for images...</p>
                 </div>
               ) : relatedImages.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {relatedImages.map((image, index) => (
-                    <div key={index} className="relative group cursor-pointer">
-                      <a href={image.context} target="_blank" rel="noopener noreferrer" className="block">
-                        <img 
-                          src={image.thumbnail || image.src} 
-                          alt={image.title || `Related image ${index + 1}`}
-                          className="rounded-md w-full h-[120px] object-cover"
-                          onError={(e) => {
-                            // Fallback if image fails to load
-                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Image+Error';
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100">
-                          <div className="flex space-x-1">
-                            <button 
-                              className="bg-white p-1.5 rounded-full"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                navigator.clipboard.writeText(`![${image.title || 'Related image'}](${image.src})`);
-                                setSystemMessage('Image markdown copied to clipboard');
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    {relatedImages.map((image, index) => (
+                      <div key={index} className="relative group cursor-pointer">
+                        <div className="overflow-hidden rounded-md border border-gray-200 bg-gray-50">
+                          <a 
+                            href={image.context} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="block relative pb-[75%]" // 4:3 aspect ratio
+                            title={image.title}
+                          >
+                            <img 
+                              src={image.thumbnail || image.src} 
+                              alt={image.title || `Related image ${index + 1}`}
+                              className="absolute inset-0 w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                              onError={(e) => {
+                                // Fallback if image fails to load
+                                const target = e.target as HTMLImageElement;
+                                target.src = 'https://via.placeholder.com/150/e2e8f0/64748b?text=Image+Error';
+                                target.onerror = null; // Prevent infinite error loops
                               }}
-                              title="Copy markdown image link"
-                            >
-                              <FaCopy size={12} />
-                            </button>
-                            <button
-                              className="bg-white p-1.5 rounded-full"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const imageMarkdown = `![${image.title || 'Related image'}](${image.src})`;
-                                const newContent = `${content}\n\n${imageMarkdown}`;
-                                setContent(newContent);
-                                setSystemMessage('Image added to note');
-                              }}
-                              title="Add image to note"
-                            >
-                              <Plus size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      </a>
-                      <p className="text-xs text-gray-600 mt-1 truncate">{image.title || `Image ${index + 1}`}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">No images found. Try updating your note content.</p>
-              )}
-            </div>
-          )}
-          
-          {/* Related topics panel */}
-          {showRelatedTopics && (
-            <div className="w-1/4 min-w-[250px] border-l border-gray-200 p-3 overflow-y-auto">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-medium text-gray-700">Related Topics</h3>
-                <button 
-                  onClick={() => setShowRelatedTopics(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              
-              {isGeneratingTopics ? (
-                <div className="flex justify-center items-center h-40">
-                  <Loader2 size={24} className="animate-spin text-indigo-500" />
-                </div>
-              ) : relatedTopics.length > 0 ? (
-                <div className="space-y-2">
-                  {relatedTopics.map((topic, index) => (
-                    <div key={index} className="p-2 bg-gray-50 rounded-md hover:bg-gray-100">
-                      <p className="text-sm font-medium">{topic}</p>
-                      <div className="flex justify-end mt-1">
-                        <button
-                          onClick={() => addRelatedTopicToNote(topic)}
-                          className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100"
-                        >
-                          Add to note
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">No related topics found. Try updating your note content.</p>
-              )}
-            </div>
-          )}
-          
-          {/* AI Chat panel */}
-          {showAIChat && (
-            <div className="w-1/3 min-w-[300px] border-l border-gray-200 flex flex-col h-full">
-              <div className="p-2 border-b border-gray-200 flex justify-between items-center bg-indigo-50">
-                <h3 className="font-medium text-indigo-700">AI Assistant</h3>
-                <button 
-                  onClick={() => setShowAIChat(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              
-              <div 
-                ref={chatContainerRef}
-                className="flex-1 p-3 overflow-y-auto space-y-4"
-              >
-                {chatMessages.map((msg) => (
-                  <div 
-                    key={msg.id} 
-                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div 
-                      className={`max-w-[80%] p-3 rounded-lg ${
-                        msg.role === 'user' 
-                          ? 'bg-indigo-500 text-white' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                      <p className="text-xs mt-1 opacity-70">
-                        {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                
-                {isSendingMessage && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-100 p-3 rounded-lg">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Show a message if chat is empty */}
-                {chatMessages.length === 0 && !isSendingMessage && (
-                  <div className="flex justify-center items-center h-full">
-                    <div className="text-center text-gray-500 p-4">
-                      <BookOpen size={24} className="mx-auto mb-2 opacity-50" />
-                      <p>Ask me a question about your note!</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <div className="p-2 border-t border-gray-200">
-                <div className="flex">
-                  <input
-                    ref={chatInputRef}
-                    type="text"
-                    value={userQuestion}
-                    onChange={(e) => setUserQuestion(e.target.value)}
-                    placeholder="Ask about your note..."
-                    className="flex-1 p-2 border border-gray-300 rounded-l-md focus:outline-none focus:border-indigo-500"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendQuestionToAI();
-                      }
-                    }}
-                    disabled={isSendingMessage}
-                  />
-                  <button
-                    onClick={sendQuestionToAI}
-                    disabled={isSendingMessage || !userQuestion.trim()}
-                    className="p-2 bg-indigo-500 text-white rounded-r-md disabled:bg-indigo-300"
-                  >
-                    {isSendingMessage ? <Loader2 size={18} className="animate-spin" /> : <FaPaperPlane size={16} />}
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Press Enter to send, Shift+Enter for new line. Ctrl+/ to toggle chat.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-        
-        {/* AI Suggestion Panel */}
-        {aiSuggestion && (
-          <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-md">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center text-indigo-600">
-                <Wand2 size={16} className="mr-2" />
-                <span className="font-medium">AI Suggestion</span>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={acceptSuggestion}
-                  className="p-1.5 bg-green-100 text-green-700 rounded-md hover:bg-green-200 flex items-center"
-                  title="Accept suggestion"
-                >
-                  <Check size={16} className="mr-1" />
-                  Apply
-                </button>
-                
-                <button
-                  onClick={rejectSuggestion}
-                  className="p-1.5 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 flex items-center"
-                  title="Reject suggestion"
-                >
-                  <X size={16} className="mr-1" />
-                  Dismiss
-                </button>
-              </div>
-            </div>
-            
-            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-gray-700 max-h-40 overflow-y-auto font-mono text-sm">
-              {aiSuggestion}
-            </div>
-          </div>
-        )}
-        
-        {/* Speech-to-text indicator */}
-        {isSpeechToText && (
-          <div className="absolute bottom-4 right-4 bg-red-600 text-white px-3 py-2 rounded-full flex items-center animate-pulse">
-            <Mic size={16} className="mr-2" />
-            Recording...
-          </div>
-        )}
-        
-        {/* Collaboration indicator */}
-        {isCollaborating && collaborators.length > 0 && (
-          <div className="absolute top-4 right-4 bg-blue-600 text-white px-3 py-2 rounded-full">
-            <span className="flex items-center">
-              <Users size={16} className="mr-2" />
-              {collaborators.length} collaborator{collaborators.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                              <div className="flex space-x-2">
+                                <button 
+                                  className="bg-white p-1.5 rounded-md shadow-md hover:bg-gray-100"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(`![${image.title || 'Related image'}](${image.src})`);
+                                    setSystemMessage('Image markdown copied to clipboard');
+                                  }}
+                                  title="Copy markdown image link"
+                                >
+                                  <FaCopy size={14} className="text-indigo-600" />
+                                </button>
+                                <button
+                                  className="bg-white p-1.5 rounded-md shadow-md hover:bg-gray-100"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const imageMarkdown = `

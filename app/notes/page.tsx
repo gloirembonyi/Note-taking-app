@@ -6,6 +6,7 @@ import { useUser } from '@clerk/nextjs';
 import { Mic, FileText, Save, X, Plus, Search, Tag, Star, StarOff, Trash2, Filter, Download, Upload, Layout, Clock, Calendar } from 'lucide-react';
 import Header from '@/components/Header';
 import AdvancedEditor from '@/components/AdvancedEditor';
+import Link from 'next/link';
 
 // Note type
 interface Note {
@@ -469,7 +470,7 @@ export default function NotesPage() {
                   className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md flex items-center mx-auto"
                 >
                   <Plus size={20} className="mr-2" />
-                  Create New Note
+            Create New Note
                 </button>
               </div>
             </div>
@@ -478,4 +479,4 @@ export default function NotesPage() {
       </div>
     </div>
   );
-} 
+}

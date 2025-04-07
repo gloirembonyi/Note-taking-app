@@ -1,52 +1,37 @@
-# NoteGenius: AI-Powered Note-Taking Application
+# NoteGenius - AI-Powered Note-Taking App
 
-NoteGenius is a modern note-taking application built with Next.js, featuring AI-powered suggestions, speech-to-text capabilities, and real-time collaboration.
+NoteGenius is a full-featured note-taking application built with Next.js that integrates AI assistance, speech-to-text capabilities, and real-time collaboration.
 
 ## Features
 
-### AI-Powered Assistance
-- **Smart Suggestions**: Get real-time writing suggestions as you type
-- **Text Formatting**: Format your text professionally with a single click
-- **Automatic Tagging**: AI automatically suggests relevant tags for your notes
-- **Meeting Transcription Enhancement**: Transform raw meeting transcripts into structured notes with action items
+### AI-Powered Assistance (Google Gemini)
+- Context-aware writing suggestions
+- Smart text formatting and organization
+- Automatic tagging and categorization
+- Meeting transcription enhancement
+- Image-to-text extraction
 
-### Speech-to-Text
-- **Voice Recording**: Record your thoughts or meetings directly in the app
-- **Speaker Identification**: Automatically identify different speakers in a conversation
-- **Real-time Transcription**: See your speech converted to text as you speak
+### Speech-to-Text (Deepgram)
+- High-quality speech transcription
+- Speaker identification
+- Real-time speech recognition
+- Smart noise reduction
 
-### Real-Time Collaboration
-- **Multi-User Editing**: Work on notes simultaneously with teammates
-- **Presence Indicators**: See who's viewing and editing your notes
-- **Cursor Tracking**: View collaborators' cursor positions in real-time
+### Real-Time Collaboration (LiveKit)
+- Multi-user editing
+- Cursor presence
+- Room-based collaboration
+- Visual collaborator indicators
 
-### User Experience
-- **Responsive Design**: Fully functional on both desktop and mobile
-- **Secure Authentication**: User authentication powered by Clerk
-- **Markdown Support**: Write using markdown for easy formatting
+## Setup Instructions
 
-## Technology Stack
-
-- **Frontend**: Next.js 14, React, TailwindCSS
-- **Authentication**: Clerk
-- **AI Integration**: Google Generative AI (Gemini)
-- **Speech-to-Text**: Deepgram
-- **Real-time Collaboration**: LiveKit
-
-## Getting Started
-
-### Prerequisites
-- Node.js 18+ and npm/yarn/pnpm
-
-### Installation
-
-1. Clone the repository:
+### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/note-taking-app.git
-cd note-taking-app
+git clone https://github.com/yourusername/Note-taking-app.git
+cd Note-taking-app
 ```
 
-2. Install dependencies:
+### 2. Install Dependencies
 ```bash
 npm install
 # or
@@ -55,27 +40,27 @@ yarn
 pnpm install
 ```
 
-3. Set up environment variables:
+### 3. Set Up Environment Variables
 Create a `.env.local` file in the root directory with the following variables:
 
-```
-# Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-CLERK_SECRET_KEY=your_clerk_secret_key
+```env
+# Google Gemini AI
+GOOGLE_GENERATIVE_AI_KEY=your_gemini_api_key
 
-# LiveKit Real-time Collaboration
-NEXT_PUBLIC_LIVEKIT_URL=your_livekit_url
+# LiveKit for real-time collaboration
+NEXT_PUBLIC_LIVEKIT_URL=your_livekit_endpoint
 LIVEKIT_API_KEY=your_livekit_api_key
 LIVEKIT_API_SECRET=your_livekit_api_secret
 
-# Google Generative AI
-NEXT_PUBLIC_GOOGLE_AI_API_KEY=your_google_ai_api_key
-
-# Deepgram Speech-to-Text
+# Deepgram for speech-to-text
 NEXT_PUBLIC_DEEPGRAM_API_KEY=your_deepgram_api_key
+
+# Clerk for authentication
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
 ```
 
-4. Run the development server:
+### 4. Run the Development Server
 ```bash
 npm run dev
 # or
@@ -84,49 +69,51 @@ yarn dev
 pnpm dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Usage
+## Ensuring Features Work with Real Data
 
-### Authentication
-- Sign up or log in using the authentication provided by Clerk
-- Once authenticated, you'll be redirected to your notes page
-
-### Creating Notes
-- Click the "+" button to create a new note
-- Add a title and start typing your content
-- Use markdown formatting for headings, lists, and more
-
-### Using AI Features
-- Click the wand icon in the editor toolbar to enable/disable AI suggestions
-- As you type, AI will suggest completions for your text
-- Select text and use the format button to change the style (professional, casual, etc.)
+### AI Integration
+1. Set up a Google Gemini API key at [https://ai.google.dev/](https://ai.google.dev/)
+2. Add your API key to the `.env.local` file
+3. Test AI suggestions by typing content in the note editor and clicking the sparkles icon
 
 ### Speech-to-Text
-- Click the microphone icon to start recording
-- Speak clearly, and your words will be transcribed
-- Stop recording when finished, and the transcription will be added to your note
+1. Set up a Deepgram API key at [https://deepgram.com/](https://deepgram.com/)
+2. Add your API key to the `.env.local` file
+3. Test speech-to-text by clicking the microphone icon and speaking
+4. Allow microphone access in your browser when prompted
 
-### Collaboration
-- Click the users icon to enable collaboration
-- Share the unique URL with others to collaborate in real-time
-- See other users' cursor positions and edits as they happen
+### Real-Time Collaboration
+1. Set up a LiveKit account at [https://livekit.io/](https://livekit.io/)
+2. Add your LiveKit credentials to the `.env.local` file
+3. Test collaboration by opening the same note in two different browsers
+4. Enable collaboration by clicking the users icon in each browser
+5. You should see real-time updates and cursor position sharing
 
-## Deployment
+### Authentication
+1. Set up a Clerk account at [https://clerk.dev/](https://clerk.dev/)
+2. Add your Clerk credentials to the `.env.local` file
+3. Test authentication by signing in using the authentication pages
 
-This application can be easily deployed on Vercel:
+## Troubleshooting
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyourusername%2Fnote-taking-app)
+### AI Suggestions Not Working
+- Ensure your Google Gemini API key is valid
+- Check browser console for errors
+- Verify that content is at least 20 characters long
 
-## License
+### Speech-to-Text Not Working
+- Ensure your Deepgram API key is valid
+- Check that microphone permissions are granted
+- Verify browser support for MediaRecorder API
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+### Collaboration Not Working
+- Ensure LiveKit credentials are correctly configured
+- Check that both users are authenticated
+- Verify that note IDs match for collaboration
+- Check browser console for WebSocket connection errors
 
-## Acknowledgements
+## Contact
 
-- [Next.js](https://nextjs.org/)
-- [Clerk](https://clerk.dev/)
-- [Google Generative AI](https://ai.google.dev/)
-- [Deepgram](https://deepgram.com/)
-- [LiveKit](https://livekit.io/)
-- [TailwindCSS](https://tailwindcss.com/)
+For support, contact [your-email@example.com](mailto:your-email@example.com).

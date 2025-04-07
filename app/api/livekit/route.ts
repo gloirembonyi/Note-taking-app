@@ -25,11 +25,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Parse the request body to get room name
+    // Parse the request body to get room name and optional username
     const body = await req.json();
-    const { roomName } = body;
+    const { room, username } = body;
 
-    if (!roomName) {
+    if (!room) {
       return NextResponse.json(
         { error: 'Room name is required' },
         { status: 400 }
@@ -39,13 +39,13 @@ export async function POST(req: NextRequest) {
     // Create a token with the user's identity
     const token = new AccessToken(apiKey, apiSecret, {
       identity: user.id,
-      name: user.firstName || 'Anonymous',
+      name: username || user.firstName || 'Anonymous',
     });
 
     // Add permissions to the token
     token.addGrant({
       roomJoin: true,
-      room: roomName,
+      room: room,
       canPublish: true,
       canSubscribe: true,
       canPublishData: true,

@@ -1,10 +1,14 @@
-// app/layout.tsx
-import { ClerkProvider } from '@clerk/nextjs';
-import '../styles/globals.css';
+// app/layout.tsx - Server Component
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import ClientLayout from './client-layout';
 
-export const metadata = {
-  title: 'NoteGenius - AI-Powered Note Taking',
-  description: 'Transform your ideas into organized, beautifully formatted notes with our AI assistant',
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata: Metadata = {
+  title: 'NoteGenius - AI-Powered Note Taking App',
+  description: 'Create, organize, and enhance your notes with AI',
 };
 
 export default function RootLayout({
@@ -13,13 +17,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body>
-          {children}
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en">
+      <body className={inter.className}>
+        <ClientLayout>{children}</ClientLayout>
+      </body>
+    </html>
   );
 }
 

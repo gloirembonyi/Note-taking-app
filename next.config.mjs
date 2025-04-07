@@ -8,6 +8,11 @@ const nextConfig = {
   // experimental: {
   //   appDir: true,
   // },
+  env: {
+    GOOGLE_GENERATIVE_AI_KEY: process.env.GOOGLE_GENERATIVE_AI_KEY,
+    NEXT_PUBLIC_LIVEKIT_URL: process.env.NEXT_PUBLIC_LIVEKIT_URL,
+    NEXT_PUBLIC_DEEPGRAM_API_KEY: process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY,
+  },
   async rewrites() {
     return [
       {

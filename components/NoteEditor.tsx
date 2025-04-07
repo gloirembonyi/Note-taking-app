@@ -152,7 +152,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave }) => {
       if (isMeetingMode) {
         await enhanceMeetingNotes(text);
       } else {
-        await formatTextWithAI(text);
+      await formatTextWithAI(text);
       }
     } catch (error) {
       console.error('Error in speech to text conversion:', error);
@@ -281,20 +281,20 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave }) => {
     setShowTitleSuggestions(false);
   };
 
-  const handleSave = async () => {
-    if (!title.trim()) {
-      alert('Please enter a title for your note.');
-      return;
-    }
+const handleSave = async () => {
+  if (!title.trim()) {
+    alert('Please enter a title for your note.');
+    return;
+  }
 
-    try {
-      const savedNote = await saveNote({ id: note?.id, title, content });
-      onSave(savedNote);
-      router.push('/notes');
-    } catch (error) {
-      console.error('Error saving note:', error);
-    }
-  };
+  try {
+    const savedNote = await saveNote({ id: note?.id, title, content });
+    onSave(savedNote);
+    router.push('/notes');
+  } catch (error) {
+    console.error('Error saving note:', error);
+  }
+};
 
   const formatCurrentContent = async () => {
     if (!content) return;
@@ -303,17 +303,17 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave }) => {
       await formatTextWithAI(content);
     } catch (error) {
       console.error('Error formatting current content:', error);
-    }
-  };
+  }
+};
 
   return (
     <div className="p-6 bg-white rounded-lg shadow-md">
       <div className="mb-4 relative">
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Note Title"
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Note Title"
           className="w-full p-3 text-lg font-semibold border border-gray-300 rounded-lg"
         />
         
@@ -342,9 +342,9 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave }) => {
       </div>
       
       <div className="relative mb-6 group">
-        <TextArea
-          value={content}
-          onChange={(e: { target: { value: React.SetStateAction<string>; }; }) => setContent(e.target.value)}
+      <TextArea
+        value={content}
+        onChange={(e: { target: { value: React.SetStateAction<string>; }; }) => setContent(e.target.value)}
           placeholder="Start typing your note or use AI assistant to help..."
           className="w-full h-96 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
         />
@@ -461,8 +461,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave }) => {
         <div className="mt-4 p-4 border border-gray-300 rounded-lg bg-gray-50">
           <h3 className="text-lg font-medium mb-2 text-gray-700">Recorded Audio</h3>
           <audio controls src={audioUrl} className="w-full">
-            Your browser does not support the audio element.
-          </audio>
+          Your browser does not support the audio element.
+        </audio>
         </div>
       )}
     </div>
