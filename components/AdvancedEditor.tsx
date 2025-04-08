@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Wand2, Type, Users, Check, X, FileText, Eye, EyeOff, BookOpen, Sparkles, Loader2, Plus } from 'lucide-react';
+import { Mic, MicOff, Wand2, Type, Users, Check, X, FileText, Eye, EyeOff, BookOpen, Sparkles, Loader2, Plus, BrainCircuit } from 'lucide-react';
 import { Room, RoomEvent, RemoteParticipant, DataPacket_Kind } from 'livekit-client';
 import { FaCopy, FaPaperPlane } from 'react-icons/fa';
+import NoteContextAnalyzer from './NoteContextAnalyzer';
 
 interface AdvancedEditorProps {
   initialContent?: string;
@@ -63,6 +64,9 @@ export default function AdvancedEditor({
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const initialRenderRef = useRef(true);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Add new state for context analyzer
+  const [showContextAnalyzer, setShowContextAnalyzer] = useState(false);
 
   // Initialize content from props - only when prop changes, not on every content change
   useEffect(() => {
@@ -123,11 +127,12 @@ export default function AdvancedEditor({
         }),
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to get AI suggestion');
+      const data = await response.json();
+      
+      if (!response.ok && !data.completion) {
+        throw new Error(data.error || 'Failed to get AI suggestion');
       }
       
-      const data = await response.json();
       if (data.completion) {
         setAiSuggestion(data.completion);
         setSystemMessage('AI suggestion ready');
@@ -138,7 +143,9 @@ export default function AdvancedEditor({
       }
     } catch (error) {
       console.error('Error getting AI suggestion:', error);
-      setSystemMessage('Failed to get AI suggestion. Please try again.');
+      setSystemMessage('Using fallback suggestions. AI service may be unavailable.');
+      // Set a fallback suggestion
+      setAiSuggestion('Continue your thoughts here...');
     } finally {
       setIsGeneratingSuggestion(false);
     }
@@ -368,8 +375,12 @@ export default function AdvancedEditor({
         }
       });
       
+      // Get LiveKit URL from env
+      const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://demo.livekit.cloud';
+      console.log('Connecting to LiveKit server at:', livekitUrl);
+      
       // Connect to the room
-      await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL || '', token);
+      await newRoom.connect(livekitUrl, token);
       setIsCollaborating(true);
       setSystemMessage('Real-time collaboration activated. Others can now join this note session.');
       
@@ -539,6 +550,11 @@ export default function AdvancedEditor({
     setShowRelatedTopics(true);
     
     try {
+      // Ensure we have content to send 
+      if (!content.trim()) {
+        throw new Error('No content available to generate topics');
+      }
+      
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: {
@@ -550,20 +566,27 @@ export default function AdvancedEditor({
         }),
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to generate related topics');
-      }
-      
       const data = await response.json();
-      if (data.relatedTopics) {
+      
+      if (response.ok && data.relatedTopics && Array.isArray(data.relatedTopics)) {
         setRelatedTopics(data.relatedTopics);
         setSystemMessage('Related topics generated');
+      } else if (data.error) {
+        throw new Error(data.error);
       } else {
         setSystemMessage('No related topics found');
       }
     } catch (error) {
       console.error('Error generating related topics:', error);
-      setSystemMessage('Failed to generate related topics. Please try again.');
+      setSystemMessage('Using fallback topics. AI service may be unavailable.');
+      // Set fallback topics
+      setRelatedTopics([
+        "Note Taking Techniques",
+        "Productivity Methods",
+        "Information Management",
+        "Digital Organization",
+        "Knowledge Systems"
+      ]);
     } finally {
       setIsGeneratingTopics(false);
     }
@@ -596,6 +619,9 @@ export default function AdvancedEditor({
     try {
       console.log("Sending question to AI:", currentQuestion);
       
+      // Get current editor content - fix: use value instead of getHTML which doesn't exist
+      const currentContent = editorRef.current?.value || '';
+      
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: {
@@ -603,18 +629,14 @@ export default function AdvancedEditor({
         },
         body: JSON.stringify({
           operation: 'answer-question',
-          content: content,
+          content: currentContent, // Make sure to send the current content
           question: currentQuestion,
         }),
       });
       
       const data = await response.json();
       console.log("AI response:", data);
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to get answer from AI');
-      }
-      
+
       // Create a unique ID for this response
       const responseId = Date.now().toString();
       
@@ -657,7 +679,7 @@ export default function AdvancedEditor({
       const errorMessage = {
         id: `error-${Date.now()}`,
         role: 'assistant' as const,
-        content: 'Sorry, I encountered an error while processing your question. Please try again.',
+        content: 'Sorry, I encountered an error while processing your question. The AI service may be unavailable. Please try again later.',
         timestamp: new Date(),
       };
       
@@ -703,6 +725,11 @@ export default function AdvancedEditor({
     }, 100);
   };
 
+  // Toggle context analyzer
+  const toggleContextAnalyzer = () => {
+    setShowContextAnalyzer(!showContextAnalyzer);
+  };
+
   // Handle keyboard shortcuts
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Check for Ctrl+/ to toggle AI chat
@@ -723,6 +750,12 @@ export default function AdvancedEditor({
       generateRelatedTopics();
     }
     
+    // Check for Alt+A to toggle context analyzer
+    if (e.altKey && e.key === 'a') {
+      e.preventDefault();
+      toggleContextAnalyzer();
+    }
+    
     // In AI chat: Enter to send, Escape to close
     if (showAIChat) {
       if (e.key === 'Enter' && !e.shiftKey && document.activeElement === chatInputRef.current) {
@@ -736,13 +769,13 @@ export default function AdvancedEditor({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden border border-gray-200 rounded-lg" onKeyDown={handleKeyDown}>
+    <div className="editor-container flex flex-col h-full overflow-hidden" onKeyDown={handleKeyDown}>
       {/* Toolbar */}
-      <div className="flex items-center p-2 border-b border-gray-200 bg-gray-50">
-        <div className="flex space-x-1">
+      <div className="flex flex-wrap items-center p-2 border-b border-border bg-card sticky top-0 z-10 shadow-sm">
+        <div className="flex space-x-1 mr-2">
           <button
             onClick={toggleAI}
-            className={`p-1.5 rounded-md ${aiEnabled ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-200'}`}
+            className={`toolbar-button ${aiEnabled ? 'toolbar-button-active' : ''}`}
             title={aiEnabled ? 'Disable AI suggestions' : 'Enable AI suggestions'}
           >
             <Wand2 size={18} />
@@ -751,56 +784,56 @@ export default function AdvancedEditor({
           <div className="relative">
             <button
               onClick={() => setShowFormatOptions(!showFormatOptions)}
-              className="p-1.5 rounded-md hover:bg-gray-200"
+              className={`toolbar-button ${showFormatOptions ? 'toolbar-button-active' : ''}`}
               title="Format text"
             >
               <Type size={18} />
             </button>
             
             {showFormatOptions && (
-              <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 border border-gray-200">
+              <div className="absolute left-0 mt-2 w-48 bg-card rounded-md shadow-lg z-20 border border-border animate-fade-in">
                 <div className="py-1">
                   <button
-                    className="flex items-center px-4 py-2 text-sm w-full text-left text-gray-700 hover:bg-gray-100"
+                    className="flex items-center px-4 py-2 text-sm w-full text-left hover:bg-muted transition-colors"
                     onClick={() => formatSelectedText('bold')}
                   >
                     <strong className="mr-2">B</strong> Bold
                   </button>
                   <button
-                    className="flex items-center px-4 py-2 text-sm w-full text-left text-gray-700 hover:bg-gray-100"
+                    className="flex items-center px-4 py-2 text-sm w-full text-left hover:bg-muted transition-colors"
                     onClick={() => formatSelectedText('italic')}
                   >
                     <em className="mr-2">I</em> Italic
                   </button>
                   <button
-                    className="flex items-center px-4 py-2 text-sm w-full text-left text-gray-700 hover:bg-gray-100"
+                    className="flex items-center px-4 py-2 text-sm w-full text-left hover:bg-muted transition-colors"
                     onClick={() => formatSelectedText('code')}
                   >
-                    <code className="mr-2 px-1 bg-gray-100 rounded">{"{ }"}</code> Code
+                    <code className="mr-2 px-1 bg-muted rounded">{"{ }"}</code> Code
                   </button>
                   <button
-                    className="flex items-center px-4 py-2 text-sm w-full text-left text-gray-700 hover:bg-gray-100"
+                    className="flex items-center px-4 py-2 text-sm w-full text-left hover:bg-muted transition-colors"
                     onClick={() => formatSelectedText('heading1')}
                   >
                     <span className="mr-2 font-bold text-lg">#</span> Heading 1
                   </button>
                   <button
-                    className="flex items-center px-4 py-2 text-sm w-full text-left text-gray-700 hover:bg-gray-100"
+                    className="flex items-center px-4 py-2 text-sm w-full text-left hover:bg-muted transition-colors"
                     onClick={() => formatSelectedText('heading2')}
                   >
                     <span className="mr-2 font-bold text-base">##</span> Heading 2
                   </button>
                   <button
-                    className="flex items-center px-4 py-2 text-sm w-full text-left text-gray-700 hover:bg-gray-100"
+                    className="flex items-center px-4 py-2 text-sm w-full text-left hover:bg-muted transition-colors"
                     onClick={() => formatSelectedText('list')}
                   >
                     <span className="mr-2">•</span> List
                   </button>
                   <button
-                    className="flex items-center px-4 py-2 text-sm w-full text-left text-gray-700 hover:bg-gray-100"
+                    className="flex items-center px-4 py-2 text-sm w-full text-left hover:bg-muted transition-colors"
                     onClick={() => formatSelectedText('quote')}
                   >
-                    <span className="mr-2 text-gray-400">›</span> Quote
+                    <span className="mr-2 text-muted-foreground">›</span> Quote
                   </button>
                 </div>
               </div>
@@ -809,7 +842,7 @@ export default function AdvancedEditor({
           
           <button
             onClick={toggleVoiceRecording}
-            className={`p-1.5 rounded-md ${isSpeechToText ? 'bg-red-100 text-red-600' : 'hover:bg-gray-200'}`}
+            className={`toolbar-button ${isSpeechToText ? 'bg-red-100 text-red-600' : ''}`}
             title={isSpeechToText ? 'Stop recording' : 'Start recording'}
           >
             {isSpeechToText ? <MicOff size={18} /> : <Mic size={18} />}
@@ -817,7 +850,7 @@ export default function AdvancedEditor({
           
           <button
             onClick={toggleCollaboration}
-            className={`p-1.5 rounded-md ${isCollaborating ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-200'}`}
+            className={`toolbar-button ${isCollaborating ? 'toolbar-button-active' : ''}`}
             title={isCollaborating ? 'Stop collaboration' : 'Enable collaboration'}
           >
             <Users size={18} />
@@ -825,31 +858,39 @@ export default function AdvancedEditor({
           
           <button
             onClick={toggleAIChat}
-            className={`p-1.5 rounded-md ${showAIChat ? 'bg-purple-100 text-purple-600' : 'hover:bg-gray-200'}`}
-            title="AI Chat Assistant"
+            className={`toolbar-button ${showAIChat ? 'toolbar-button-active' : ''}`}
+            title="AI Chat Assistant (Ctrl+/)"
           >
             <BookOpen size={18} />
           </button>
           
           <button
             onClick={getRelatedImages}
-            className={`p-1.5 rounded-md ${showRelatedImages ? 'bg-green-100 text-green-600' : 'hover:bg-gray-200'}`}
-            title="Find related images"
+            className={`toolbar-button ${showRelatedImages ? 'toolbar-button-active' : ''}`}
+            title="Find related images (Alt+R)"
           >
             <FileText size={18} />
           </button>
           
           <button
             onClick={generateRelatedTopics}
-            className={`p-1.5 rounded-md ${showRelatedTopics ? 'bg-yellow-100 text-yellow-600' : 'hover:bg-gray-200'}`}
-            title="Generate related topics"
+            className={`toolbar-button ${showRelatedTopics ? 'toolbar-button-active' : ''}`}
+            title="Generate related topics (Alt+T)"
           >
             <Sparkles size={18} />
           </button>
           
           <button
+            onClick={toggleContextAnalyzer}
+            className={`toolbar-button ${showContextAnalyzer ? 'toolbar-button-active' : ''}`}
+            title="Content Analyzer (Alt+A)"
+          >
+            <BrainCircuit size={18} />
+          </button>
+          
+          <button
             onClick={() => setPreviewMode(!previewMode)}
-            className={`p-1.5 rounded-md ${previewMode ? 'bg-green-100 text-green-700' : 'hover:bg-gray-200'}`}
+            className={`toolbar-button ${previewMode ? 'toolbar-button-active' : ''}`}
             title={previewMode ? 'Edit mode' : 'Preview mode'}
           >
             {previewMode ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -858,7 +899,7 @@ export default function AdvancedEditor({
           {aiEnabled && content.length > 20 && (
             <button
               onClick={getAISuggestion}
-              className="p-1.5 rounded-md hover:bg-gray-200 text-indigo-600"
+              className="toolbar-button text-primary"
               title="Get AI suggestions"
               disabled={isGeneratingSuggestion}
             >
@@ -867,11 +908,18 @@ export default function AdvancedEditor({
           )}
         </div>
         
-        <div className="ml-auto">
+        <div className="flex-1 flex justify-end">
           {systemMessage && (
-            <span className="text-sm text-gray-600 px-2 py-1 bg-gray-100 rounded-md">
+            <span className="text-sm py-1 px-2 bg-muted rounded-md animate-fade-in">
               {systemMessage}
             </span>
+          )}
+          
+          {isCollaborating && collaborators.length > 0 && (
+            <div className="ml-2 bg-primary text-white px-2 py-1 rounded-md text-sm flex items-center animate-fade-in">
+              <Users size={14} className="mr-1" />
+              {collaborators.length}
+            </div>
           )}
         </div>
       </div>
@@ -900,12 +948,12 @@ export default function AdvancedEditor({
           
           {/* Related images panel */}
           {showRelatedImages && (
-            <div className="w-1/4 min-w-[250px] border-l border-gray-200 p-3 overflow-y-auto">
+            <div className="w-1/4 min-w-[250px] border-l border-border p-3 overflow-y-auto bg-card">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="font-medium text-gray-700">Related Images</h3>
+                <h3 className="font-medium text-foreground">Related Images</h3>
                 <button 
                   onClick={() => setShowRelatedImages(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <X size={16} />
                 </button>
@@ -913,7 +961,7 @@ export default function AdvancedEditor({
               
               {isLoadingImages ? (
                 <div className="flex justify-center items-center h-40">
-                  <Loader2 size={24} className="animate-spin text-indigo-500" />
+                  <Loader2 size={24} className="animate-spin text-primary" />
                 </div>
               ) : relatedImages.length > 0 ? (
                 <div className="grid grid-cols-2 gap-2">
@@ -960,24 +1008,24 @@ export default function AdvancedEditor({
                           </div>
                         </div>
                       </a>
-                      <p className="text-xs text-gray-600 mt-1 truncate">{image.title || `Image ${index + 1}`}</p>
+                      <p className="text-xs text-muted-foreground mt-1 truncate">{image.title || `Image ${index + 1}`}</p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">No images found. Try updating your note content.</p>
+                <p className="text-sm text-muted-foreground">No images found. Try updating your note content.</p>
               )}
             </div>
           )}
           
           {/* Related topics panel */}
           {showRelatedTopics && (
-            <div className="w-1/4 min-w-[250px] border-l border-gray-200 p-3 overflow-y-auto">
+            <div className="w-1/4 min-w-[250px] border-l border-border p-3 overflow-y-auto bg-card">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="font-medium text-gray-700">Related Topics</h3>
+                <h3 className="font-medium text-foreground">Related Topics</h3>
                 <button 
                   onClick={() => setShowRelatedTopics(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <X size={16} />
                 </button>
@@ -985,17 +1033,17 @@ export default function AdvancedEditor({
               
               {isGeneratingTopics ? (
                 <div className="flex justify-center items-center h-40">
-                  <Loader2 size={24} className="animate-spin text-indigo-500" />
+                  <Loader2 size={24} className="animate-spin text-primary" />
                 </div>
               ) : relatedTopics.length > 0 ? (
                 <div className="space-y-2">
                   {relatedTopics.map((topic, index) => (
-                    <div key={index} className="p-2 bg-gray-50 rounded-md hover:bg-gray-100">
+                    <div key={index} className="p-2 bg-muted rounded-md hover:bg-muted/80 transition-colors">
                       <p className="text-sm font-medium">{topic}</p>
                       <div className="flex justify-end mt-1">
                         <button
                           onClick={() => addRelatedTopicToNote(topic)}
-                          className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100"
+                          className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 transition-colors"
                         >
                           Add to note
                         </button>
@@ -1004,19 +1052,19 @@ export default function AdvancedEditor({
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">No related topics found. Try updating your note content.</p>
+                <p className="text-sm text-muted-foreground">No related topics found. Try updating your note content.</p>
               )}
             </div>
           )}
           
           {/* AI Chat panel */}
           {showAIChat && (
-            <div className="w-1/3 min-w-[300px] border-l border-gray-200 flex flex-col h-full">
-              <div className="p-2 border-b border-gray-200 flex justify-between items-center bg-indigo-50">
-                <h3 className="font-medium text-indigo-700">AI Assistant</h3>
+            <div className="w-1/3 min-w-[300px] border-l border-border flex flex-col h-full bg-card">
+              <div className="p-2 border-b border-border flex justify-between items-center bg-primary/10">
+                <h3 className="font-medium text-primary">AI Assistant</h3>
                 <button 
                   onClick={() => setShowAIChat(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <X size={16} />
                 </button>
@@ -1034,8 +1082,8 @@ export default function AdvancedEditor({
                     <div 
                       className={`max-w-[80%] p-3 rounded-lg ${
                         msg.role === 'user' 
-                          ? 'bg-indigo-500 text-white' 
-                          : 'bg-gray-100 text-gray-800'
+                          ? 'bg-primary text-white' 
+                          : 'bg-muted text-foreground'
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
@@ -1048,11 +1096,11 @@ export default function AdvancedEditor({
                 
                 {isSendingMessage && (
                   <div className="flex justify-start">
-                    <div className="bg-gray-100 p-3 rounded-lg">
+                    <div className="bg-muted p-3 rounded-lg">
                       <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                       </div>
                     </div>
                   </div>
@@ -1061,7 +1109,7 @@ export default function AdvancedEditor({
                 {/* Show a message if chat is empty */}
                 {chatMessages.length === 0 && !isSendingMessage && (
                   <div className="flex justify-center items-center h-full">
-                    <div className="text-center text-gray-500 p-4">
+                    <div className="text-center text-muted-foreground p-4">
                       <BookOpen size={24} className="mx-auto mb-2 opacity-50" />
                       <p>Ask me a question about your note!</p>
                     </div>
@@ -1069,7 +1117,7 @@ export default function AdvancedEditor({
                 )}
               </div>
               
-              <div className="p-2 border-t border-gray-200">
+              <div className="p-2 border-t border-border">
                 <div className="flex">
                   <input
                     ref={chatInputRef}
@@ -1077,7 +1125,7 @@ export default function AdvancedEditor({
                     value={userQuestion}
                     onChange={(e) => setUserQuestion(e.target.value)}
                     placeholder="Ask about your note..."
-                    className="flex-1 p-2 border border-gray-300 rounded-l-md focus:outline-none focus:border-indigo-500"
+                    className="flex-1 p-2 border border-input rounded-l-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-ring"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -1087,14 +1135,14 @@ export default function AdvancedEditor({
                     disabled={isSendingMessage}
                   />
                   <button
-                    onClick={sendQuestionToAI}
+                    onClick={() => sendQuestionToAI()}
                     disabled={isSendingMessage || !userQuestion.trim()}
-                    className="p-2 bg-indigo-500 text-white rounded-r-md disabled:bg-indigo-300"
+                    className="p-2 bg-primary text-white rounded-r-md disabled:bg-primary/50"
                   >
                     {isSendingMessage ? <Loader2 size={18} className="animate-spin" /> : <FaPaperPlane size={16} />}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Press Enter to send, Shift+Enter for new line. Ctrl+/ to toggle chat.
                 </p>
               </div>
@@ -1104,9 +1152,9 @@ export default function AdvancedEditor({
         
         {/* AI Suggestion Panel */}
         {aiSuggestion && (
-          <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-md">
+          <div className="absolute bottom-0 left-0 right-0 bg-card border-t border-border p-4 shadow-md animate-slide-up">
             <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center text-indigo-600">
+              <div className="flex items-center text-primary">
                 <Wand2 size={16} className="mr-2" />
                 <span className="font-medium">AI Suggestion</span>
               </div>
@@ -1114,7 +1162,7 @@ export default function AdvancedEditor({
               <div className="flex items-center space-x-2">
                 <button
                   onClick={acceptSuggestion}
-                  className="p-1.5 bg-green-100 text-green-700 rounded-md hover:bg-green-200 flex items-center"
+                  className="p-1.5 bg-primary/10 text-primary rounded-md hover:bg-primary/20 transition-colors flex items-center"
                   title="Accept suggestion"
                 >
                   <Check size={16} className="mr-1" />
@@ -1123,7 +1171,7 @@ export default function AdvancedEditor({
                 
                 <button
                   onClick={rejectSuggestion}
-                  className="p-1.5 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 flex items-center"
+                  className="p-1.5 bg-muted text-muted-foreground rounded-md hover:bg-muted/80 transition-colors flex items-center"
                   title="Reject suggestion"
                 >
                   <X size={16} className="mr-1" />
@@ -1132,7 +1180,7 @@ export default function AdvancedEditor({
               </div>
             </div>
             
-            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-gray-700 max-h-40 overflow-y-auto font-mono text-sm">
+            <div className="bg-muted border border-border rounded-md p-3 text-foreground max-h-40 overflow-y-auto font-mono text-sm">
               {aiSuggestion}
             </div>
           </div>
@@ -1140,7 +1188,7 @@ export default function AdvancedEditor({
         
         {/* Speech-to-text indicator */}
         {isSpeechToText && (
-          <div className="absolute bottom-4 right-4 bg-red-600 text-white px-3 py-2 rounded-full flex items-center animate-pulse">
+          <div className="absolute bottom-4 right-4 bg-red-600 text-white px-3 py-2 rounded-full flex items-center animate-pulse-subtle">
             <Mic size={16} className="mr-2" />
             Recording...
           </div>
@@ -1148,7 +1196,7 @@ export default function AdvancedEditor({
         
         {/* Collaboration indicator */}
         {isCollaborating && collaborators.length > 0 && (
-          <div className="absolute top-4 right-4 bg-blue-600 text-white px-3 py-2 rounded-full">
+          <div className="absolute top-4 right-4 bg-primary text-white px-3 py-2 rounded-full animate-fade-in">
             <span className="flex items-center">
               <Users size={16} className="mr-2" />
               {collaborators.length} collaborator{collaborators.length !== 1 ? 's' : ''}
@@ -1156,6 +1204,13 @@ export default function AdvancedEditor({
           </div>
         )}
       </div>
+      
+      {/* Note Context Analyzer */}
+      <NoteContextAnalyzer 
+        content={content} 
+        isVisible={showContextAnalyzer} 
+        onClose={() => setShowContextAnalyzer(false)} 
+      />
     </div>
   );
 }

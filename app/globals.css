@@ -2,6 +2,143 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --primary: #4f46e5;
+  --primary-dark: #3730a3;
+  --primary-light: #818cf8;
+  --secondary: #16a34a;
+  --secondary-dark: #166534;
+  --accent: #f59e0b;
+  --background: #ffffff;
+  --foreground: #020617;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --card: #ffffff;
+  --card-foreground: #020617;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: rgba(79, 70, 229, 0.3);
+  --radius: 0.5rem;
+}
+
+.dark {
+  --primary: #818cf8;
+  --primary-dark: #6366f1;
+  --primary-light: #a5b4fc;
+  --secondary: #22c55e;
+  --secondary-dark: #16a34a;
+  --accent: #fbbf24;
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --card: #1e293b;
+  --card-foreground: #f8fafc;
+  --border: #334155;
+  --input: #334155;
+  --ring: rgba(129, 140, 248, 0.3);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+  
+  .animate-pulse-subtle {
+    animation: pulseShadow 2s infinite;
+  }
+  
+  .editor-container {
+    @apply relative border border-border rounded-lg shadow-sm transition-all duration-200 ease-in-out;
+  }
+  
+  .editor-container:focus-within {
+    @apply shadow-md ring-2 ring-ring border-primary;
+  }
+  
+  .toolbar-button {
+    @apply p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors;
+  }
+  
+  .toolbar-button-active {
+    @apply bg-primary/10 text-primary;
+  }
+  
+  .feature-card {
+    @apply p-4 border border-border rounded-xl bg-card shadow-sm hover:shadow-md transition-all duration-200 ease-in-out;
+  }
+  
+  .sidebar-item {
+    @apply flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors;
+  }
+  
+  .sidebar-item-active {
+    @apply bg-primary/10 text-primary;
+  }
+  
+  .chip {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulseShadow {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 3px var(--ring); }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
 /* Global styles */
 html,
 body {

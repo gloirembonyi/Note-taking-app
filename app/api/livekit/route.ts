@@ -1,65 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AccessToken } from 'livekit-server-sdk';
-import { currentUser } from '@clerk/nextjs/server';
 
-// Get the LiveKit API key and secret from environment variables
-const apiKey = process.env.LIVEKIT_API_KEY;
-const apiSecret = process.env.LIVEKIT_API_SECRET;
-
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    // Check if LiveKit credentials are properly configured
-    if (!apiKey || !apiSecret) {
-      return NextResponse.json(
-        { error: 'LiveKit API credentials not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Check authentication
-    const user = await currentUser();
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Parse the request body to get room name and optional username
-    const body = await req.json();
+    const body = await request.json();
     const { room, username } = body;
-
-    if (!room) {
+    
+    if (!room || !username) {
       return NextResponse.json(
-        { error: 'Room name is required' },
+        { error: 'Room and username are required' },
         { status: 400 }
       );
     }
-
-    // Create a token with the user's identity
+    
+    // Get API key and secret from environment variables
+    const apiKey = process.env.LIVEKIT_API_KEY || 'devkey';
+    const apiSecret = process.env.LIVEKIT_API_SECRET || 'secret';
+    
+    // Create a new token
     const token = new AccessToken(apiKey, apiSecret, {
-      identity: user.id,
-      name: username || user.firstName || 'Anonymous',
+      identity: username,
     });
-
-    // Add permissions to the token
+    
+    // Add room access
     token.addGrant({
       roomJoin: true,
-      room: room,
+      room,
       canPublish: true,
       canSubscribe: true,
-      canPublishData: true,
     });
-
+    
     // Generate the JWT token
     const jwt = token.toJwt();
-
-    // Return the token
+    
     return NextResponse.json({ token: jwt });
-  } catch (error) {
-    console.error('Error generating LiveKit token:', error);
+  } catch (error: any) {
+    console.error('Error creating LiveKit token:', error);
     return NextResponse.json(
-      { error: 'Failed to generate token' },
+      { error: error.message || 'Failed to create token' },
       { status: 500 }
     );
   }

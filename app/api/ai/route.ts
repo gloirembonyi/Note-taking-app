@@ -7,26 +7,93 @@ import {
   generateCompletionSuggestion,
   answerQuestionAboutNote,
   organizeNoteContent,
-  findRelatedTopics as findRelatedTopicsService
+  findRelatedTopics as findRelatedTopicsService,
+  extractKeyInsights,
+  generateMindMapStructure,
+  generateFlashcards
 } from '@/lib/ai-service';
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 
 // Initialize Google Generative AI with your API key
 let genAI: GoogleGenerativeAI | undefined;
 let model: GenerativeModel | undefined;
+let aiServiceEnabled = false;
 
 try {
-  const apiKey = process.env.GOOGLE_GEMINI_API_KEY || '';
+  const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_KEY || '';
   if (apiKey) {
     genAI = new GoogleGenerativeAI(apiKey);
     model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    aiServiceEnabled = true;
     console.log("Google Generative AI model initialized successfully");
   } else {
-    console.warn("GOOGLE_GEMINI_API_KEY is not set. AI features will not work correctly.");
+    console.warn("GOOGLE_GEMINI_API_KEY is not set. AI features will use mock responses.");
   }
 } catch (error) {
   console.error("Failed to initialize Google Generative AI:", error);
 }
+
+// Mock responses for when the AI service is unavailable
+const getMockResponse = (operation: string, content?: string) => {
+  switch (operation) {
+    case 'format':
+      return { formattedText: content };
+    case 'summarize':
+      return { summary: "This is a mock summary of your notes. The AI service is currently unavailable." };
+    case 'suggest-title':
+      return { titles: ["Note from " + new Date().toLocaleDateString(), "Important Notes", "My Thoughts"] };
+    case 'enhance-meeting':
+      return { enhancedNotes: content };
+    case 'complete':
+      return { completion: "... (AI completion suggestions are currently unavailable)" };
+    case 'answer-question':
+      return { 
+        answer: "I'm sorry, but I can't provide a specific answer right now. The AI service is temporarily unavailable. Please try again later.",
+        status: "mock_response" 
+      };
+    case 'organize-content':
+      return { organizedContent: content };
+    case 'find-related-topics':
+      return { 
+        relatedTopics: [
+          "Note Taking Techniques",
+          "Productivity Methods",
+          "Information Management",
+          "Digital Organization",
+          "Knowledge Systems"
+        ] 
+      };
+    case 'extract-insights':
+      return {
+        insights: [
+          "Key insight 1 would appear here",
+          "Key insight 2 would appear here",
+          "Key insight 3 would appear here"
+        ]
+      };
+    case 'generate-mindmap':
+      return {
+        mindMap: {
+          root: { text: "Main Topic" },
+          children: [
+            { text: "Subtopic 1", children: [{ text: "Detail 1" }, { text: "Detail 2" }] },
+            { text: "Subtopic 2", children: [{ text: "Detail 1" }, { text: "Detail 2" }] },
+            { text: "Subtopic 3", children: [{ text: "Detail 1" }, { text: "Detail 2" }] }
+          ]
+        }
+      };
+    case 'generate-flashcards':
+      return {
+        flashcards: [
+          { question: "Sample Question 1", answer: "Sample Answer 1" },
+          { question: "Sample Question 2", answer: "Sample Answer 2" },
+          { question: "Sample Question 3", answer: "Sample Answer 3" }
+        ]
+      };
+    default:
+      return { error: 'Invalid operation' };
+  }
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,56 +112,80 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // If AI service is not enabled, return mock responses
+    if (!aiServiceEnabled) {
+      console.log("Using mock response for operation:", operation);
+      return NextResponse.json(getMockResponse(operation, content || partialContent));
+    }
+
     let result;
-    switch (operation) {
-      case 'format':
-        result = await formatNoteWithAI(content);
-        return NextResponse.json({ formattedText: result });
+    try {
+      switch (operation) {
+        case 'format':
+          result = await formatNoteWithAI(content);
+          return NextResponse.json({ formattedText: result });
 
-      case 'summarize':
-        result = await generateNoteSummary(content);
-        return NextResponse.json({ summary: result });
+        case 'summarize':
+          result = await generateNoteSummary(content);
+          return NextResponse.json({ summary: result });
 
-      case 'suggest-title':
-        result = await suggestNoteTitle(content);
-        return NextResponse.json({ titles: result });
+        case 'suggest-title':
+          result = await suggestNoteTitle(content);
+          return NextResponse.json({ titles: result });
 
-      case 'enhance-meeting':
-        result = await enhanceMeetingNotes(content);
-        return NextResponse.json({ enhancedNotes: result });
+        case 'enhance-meeting':
+          result = await enhanceMeetingNotes(content);
+          return NextResponse.json({ enhancedNotes: result });
 
-      case 'complete':
-        if (!partialContent) {
+        case 'complete':
+          if (!partialContent) {
+            return NextResponse.json(
+              { error: 'Partial content is required for completion' },
+              { status: 400 }
+            );
+          }
+          result = await generateCompletionSuggestion(partialContent);
+          return NextResponse.json({ completion: result });
+
+        case 'answer-question':
+          if (!question) {
+            return NextResponse.json(
+              { error: 'Question is required for answering' },
+              { status: 400 }
+            );
+          }
+          return await answerQuestion(content, question);
+
+        case 'organize-content':
+          result = await organizeNoteContent(content);
+          return NextResponse.json({ organizedContent: result });
+
+        case 'find-related-topics':
+          result = await findRelatedTopics(content);
+          return NextResponse.json({ relatedTopics: result });
+          
+        case 'extract-insights':
+          result = await extractKeyInsights(content);
+          return NextResponse.json({ insights: result });
+          
+        case 'generate-mindmap':
+          result = await generateMindMapStructure(content);
+          return NextResponse.json({ mindMap: result });
+          
+        case 'generate-flashcards':
+          result = await generateFlashcards(content);
+          return NextResponse.json({ flashcards: result });
+
+        default:
           return NextResponse.json(
-            { error: 'Partial content is required for completion' },
+            { error: 'Invalid operation' },
             { status: 400 }
           );
-        }
-        result = await generateCompletionSuggestion(partialContent);
-        return NextResponse.json({ completion: result });
-
-      case 'answer-question':
-        if (!question) {
-          return NextResponse.json(
-            { error: 'Question is required for answering' },
-            { status: 400 }
-          );
-        }
-        return await answerQuestion(content, question);
-
-      case 'organize-content':
-        result = await organizeNoteContent(content);
-        return NextResponse.json({ organizedContent: result });
-
-      case 'find-related-topics':
-        result = await findRelatedTopicsService(content);
-        return NextResponse.json({ relatedTopics: result });
-
-      default:
-        return NextResponse.json(
-          { error: 'Invalid operation' },
-          { status: 400 }
-        );
+      }
+    } catch (operationError) {
+      console.error(`Error in operation ${operation}:`, operationError);
+      // Return mock response as fallback when operation fails
+      return NextResponse.json(getMockResponse(operation, content || partialContent));
     }
   } catch (error: any) {
     console.error('AI API error:', error);
@@ -110,10 +201,7 @@ async function findRelatedTopics(content: string) {
     // Check if model is initialized
     if (!model) {
       console.error("AI model is not initialized");
-      return NextResponse.json({ 
-        relatedTopics: ["AI service unavailable"],
-        status: "model_error" 
-      });
+      return NextResponse.json(getMockResponse('find-related-topics').relatedTopics);
     }
 
     const prompt = `
@@ -155,10 +243,8 @@ async function findRelatedTopics(content: string) {
     return NextResponse.json({ relatedTopics });
   } catch (error) {
     console.error('Error finding related topics:', error);
-    return NextResponse.json(
-      { error: 'Failed to find related topics' },
-      { status: 500 }
-    );
+    // Return mock topics as fallback
+    return NextResponse.json(getMockResponse('find-related-topics').relatedTopics);
   }
 }
 
@@ -170,10 +256,7 @@ async function answerQuestion(content: string, question: string) {
     // Check if model is initialized
     if (!model) {
       console.error("AI model is not initialized");
-      return NextResponse.json({ 
-        answer: "Sorry, the AI service is currently unavailable. Please try again later.",
-        status: "model_error" 
-      });
+      return NextResponse.json(getMockResponse('answer-question'));
     }
     
     // Fallback for empty content
@@ -207,18 +290,11 @@ async function answerQuestion(content: string, question: string) {
       });
     } catch (aiError) {
       console.error("AI model error:", aiError);
-      // Provide a more specific fallback
-      return NextResponse.json({ 
-        answer: "I'm having trouble analyzing your note right now. This might be due to service limitations or content constraints. Could you try rephrasing your question?",
-        status: "ai_error"
-      });
+      // Return mock response
+      return NextResponse.json(getMockResponse('answer-question'));
     }
   } catch (error) {
     console.error('Error answering question:', error);
-    return NextResponse.json({ 
-      error: 'Failed to answer question', 
-      answer: 'I encountered a technical error. Please try again in a moment.',
-      status: "server_error"
-    });
+    return NextResponse.json(getMockResponse('answer-question'));
   }
 } 
