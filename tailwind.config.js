@@ -24,10 +24,13 @@ module.exports = {
         primary: {
           DEFAULT: "var(--primary)",
           foreground: "var(--primary-foreground)",
+          dark: "var(--primary-dark)",
+          light: "var(--primary-light)",
         },
         secondary: {
           DEFAULT: "var(--secondary)",
           foreground: "var(--secondary-foreground)",
+          dark: "var(--secondary-dark)",
         },
         destructive: {
           DEFAULT: "var(--destructive)",
@@ -85,9 +88,15 @@ module.exports = {
           to: { transform: "translateY(0)", opacity: 1 },
         },
       },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+      },
     },
   },
-  plugins: [require("@tailwindcss/typography")],
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
 }
 
 

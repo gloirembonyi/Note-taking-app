@@ -3,12 +3,19 @@
 @tailwind utilities;
 
 :root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
   --primary: #4f46e5;
+  --primary-rgb: 79, 70, 229;
   --primary-dark: #3730a3;
   --primary-light: #818cf8;
+  --primary-foreground: #ffffff;
   --secondary: #16a34a;
   --secondary-dark: #166534;
+  --secondary-foreground: #ffffff;
   --accent: #f59e0b;
+  --accent-foreground: #ffffff;
   --background: #ffffff;
   --foreground: #020617;
   --muted: #f1f5f9;
@@ -19,33 +26,52 @@
   --input: #e2e8f0;
   --ring: rgba(79, 70, 229, 0.3);
   --radius: 0.5rem;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
 }
 
-.dark {
-  --primary: #818cf8;
-  --primary-dark: #6366f1;
-  --primary-light: #a5b4fc;
-  --secondary: #22c55e;
-  --secondary-dark: #16a34a;
-  --accent: #fbbf24;
-  --background: #0f172a;
-  --foreground: #f8fafc;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --card: #1e293b;
-  --card-foreground: #f8fafc;
-  --border: #334155;
-  --input: #334155;
-  --ring: rgba(129, 140, 248, 0.3);
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+    --primary: #818cf8;
+    --primary-rgb: 129, 140, 248;
+    --primary-dark: #6366f1;
+    --primary-light: #a5b4fc;
+    --secondary: #22c55e;
+    --secondary-dark: #16a34a;
+    --accent: #fbbf24;
+    --background: #0f172a;
+    --foreground: #f8fafc;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --card: #1e293b;
+    --card-foreground: #f8fafc;
+    --border: #334155;
+    --input: #334155;
+    --ring: rgba(129, 140, 248, 0.3);
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  font-feature-settings: "rlig" 1, "calt" 1;
 }
 
 @layer base {
   * {
     @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
@@ -79,7 +105,8 @@
   }
   
   .toolbar-button-active {
-    @apply bg-primary/10 text-primary;
+    background-color: rgba(var(--primary-rgb, 79, 70, 229), 0.1);
+    color: var(--primary);
   }
   
   .feature-card {
@@ -91,7 +118,8 @@
   }
   
   .sidebar-item-active {
-    @apply bg-primary/10 text-primary;
+    background-color: rgba(var(--primary-rgb, 79, 70, 229), 0.1);
+    color: var(--primary);
   }
   
   .chip {
@@ -137,15 +165,6 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
-}
-
-/* Global styles */
-html,
-body {
-  padding: 0;
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
-    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
 }
 
 * {
