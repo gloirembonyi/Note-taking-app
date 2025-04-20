@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { 
-  formatNoteWithAI, 
   generateNoteSummary, 
   suggestNoteTitle, 
   enhanceMeetingNotes,
   generateCompletionSuggestion,
-  answerQuestionAboutNote,
   organizeNoteContent,
-  findRelatedTopics as findRelatedTopicsService,
   extractKeyInsights,
   generateMindMapStructure,
-  generateFlashcards
+  generateFlashcards,
+  formatNote,
+  findRelatedTopics,
+  answerQuestion
 } from '@/lib/ai-service';
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 
@@ -97,45 +97,34 @@ const getMockResponse = (operation: string, content?: string) => {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("AI API request received");
-    
     const body = await request.json();
-    const { content, operation, partialContent, question, imageBase64 } = body;
+    const { content, operation, question, partialContent } = body;
     
-    console.log("Operation:", operation);
-    
-    if (!content && !partialContent && !imageBase64) {
-      console.log("Missing required content");
+    if (!content && !partialContent) {
       return NextResponse.json(
-        { error: 'Content, partial content, or image is required' },
+        { error: 'Content or partial content is required' },
         { status: 400 }
       );
     }
 
-    // If AI service is not enabled, return mock responses
-    if (!aiServiceEnabled) {
-      console.log("Using mock response for operation:", operation);
-      return NextResponse.json(getMockResponse(operation, content || partialContent));
-    }
-
-    let result;
+    // Use the imported functions from ai-service.ts
     try {
       switch (operation) {
         case 'format':
-          result = await formatNoteWithAI(content);
-          return NextResponse.json({ formattedText: result });
+          const formattedText = await formatNote(content);
+          return NextResponse.json({ formattedText });
 
         case 'summarize':
-          result = await generateNoteSummary(content);
-          return NextResponse.json({ summary: result });
+          const summary = await generateNoteSummary(content);
+          return NextResponse.json({ summary });
 
         case 'suggest-title':
-          result = await suggestNoteTitle(content);
-          return NextResponse.json({ titles: result });
+          const titles = await suggestNoteTitle(content);
+          return NextResponse.json({ titles });
 
         case 'enhance-meeting':
-          result = await enhanceMeetingNotes(content);
-          return NextResponse.json({ enhancedNotes: result });
+          const enhancedNotes = await enhanceMeetingNotes(content);
+          return NextResponse.json({ enhancedNotes });
 
         case 'complete':
           if (!partialContent) {
@@ -144,37 +133,39 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
-          result = await generateCompletionSuggestion(partialContent);
-          return NextResponse.json({ completion: result });
+          const completion = await generateCompletionSuggestion(partialContent);
+          return NextResponse.json({ completion });
 
-        case 'answer-question':
+        case 'find-topics':
+        case 'find-related-topics':
+          const topics = await findRelatedTopics(content);
+          return NextResponse.json({ topics, relatedTopics: topics });
+
+        case 'ask-question':
           if (!question) {
             return NextResponse.json(
-              { error: 'Question is required for answering' },
+              { error: 'Question is required' },
               { status: 400 }
             );
           }
-          return await answerQuestion(content, question);
+          const answer = await answerQuestion(content, question);
+          return NextResponse.json({ answer });
 
         case 'organize-content':
-          result = await organizeNoteContent(content);
-          return NextResponse.json({ organizedContent: result });
-
-        case 'find-related-topics':
-          result = await findRelatedTopics(content);
-          return NextResponse.json({ relatedTopics: result });
+          const organizedContent = await organizeNoteContent(content);
+          return NextResponse.json({ organizedContent });
           
         case 'extract-insights':
-          result = await extractKeyInsights(content);
-          return NextResponse.json({ insights: result });
+          const insights = await extractKeyInsights(content);
+          return NextResponse.json({ insights });
           
         case 'generate-mindmap':
-          result = await generateMindMapStructure(content);
-          return NextResponse.json({ mindMap: result });
+          const mindMap = await generateMindMapStructure(content);
+          return NextResponse.json({ mindMap });
           
         case 'generate-flashcards':
-          result = await generateFlashcards(content);
-          return NextResponse.json({ flashcards: result });
+          const flashcards = await generateFlashcards(content);
+          return NextResponse.json({ flashcards });
 
         default:
           return NextResponse.json(
@@ -182,119 +173,16 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
       }
-    } catch (operationError) {
-      console.error(`Error in operation ${operation}:`, operationError);
-      // Return mock response as fallback when operation fails
-      return NextResponse.json(getMockResponse(operation, content || partialContent));
+    } catch (opError) {
+      console.error(`Error in AI operation ${operation}:`, opError);
+      // Fall back to mock responses
+      return NextResponse.json(getMockResponse(operation, content));
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('AI API error:', error);
     return NextResponse.json(
-      { error: error.message || 'Something went wrong' },
+      { error: 'Failed to process AI request' },
       { status: 500 }
     );
-  }
-}
-
-async function findRelatedTopics(content: string) {
-  try {
-    // Check if model is initialized
-    if (!model) {
-      console.error("AI model is not initialized");
-      return NextResponse.json(getMockResponse('find-related-topics').relatedTopics);
-    }
-
-    const prompt = `
-      Based on the following note content, suggest 5 related topics that would be valuable to add to this note. 
-      Return your response as a JSON array of strings with just the topic names.
-      
-      Note content:
-      ${content.substring(0, 2000)}
-    `;
-
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    
-    // Attempt to parse JSON from the response
-    let relatedTopics = [];
-    try {
-      // Find JSON array in the response text
-      const match = text.match(/\[[\s\S]*\]/);
-      if (match) {
-        relatedTopics = JSON.parse(match[0]);
-      } else {
-        // Fallback: Split by newlines and clean up
-        relatedTopics = text
-          .split('\n')
-          .map(line => line.replace(/^\d+\.\s*/, '').trim())
-          .filter(line => line.length > 0)
-          .slice(0, 5);
-      }
-    } catch (parseError) {
-      console.error('Error parsing AI response:', parseError);
-      // Fallback: Split by newlines and clean up
-      relatedTopics = text
-        .split('\n')
-        .map(line => line.replace(/^\d+\.\s*/, '').trim())
-        .filter(line => line.length > 0)
-        .slice(0, 5);
-    }
-
-    return NextResponse.json({ relatedTopics });
-  } catch (error) {
-    console.error('Error finding related topics:', error);
-    // Return mock topics as fallback
-    return NextResponse.json(getMockResponse('find-related-topics').relatedTopics);
-  }
-}
-
-async function answerQuestion(content: string, question: string) {
-  try {
-    console.log("Processing question:", question);
-    console.log("Content length:", content.length);
-    
-    // Check if model is initialized
-    if (!model) {
-      console.error("AI model is not initialized");
-      return NextResponse.json(getMockResponse('answer-question'));
-    }
-    
-    // Fallback for empty content
-    if (!content || content.trim().length < 10) {
-      return NextResponse.json({ 
-        answer: "I need more content in your note to provide a relevant answer. Please add some text to your note first." 
-      });
-    }
-    
-    const prompt = `
-      You are an AI assistant helping with a note-taking application. The user has a question about their note content.
-      
-      Note content:
-      ${content.substring(0, 3000)}
-      
-      User question:
-      ${question}
-      
-      Please provide a helpful, concise answer based solely on the note content. If the answer cannot be determined from the note content, explain that kindly.
-    `;
-
-    try {
-      const result = await model.generateContent(prompt);
-      const answer = result.response.text();
-      console.log("Generated answer successfully");
-      
-      // Ensure we're returning a string
-      return NextResponse.json({ 
-        answer: answer.toString(),
-        status: "success" 
-      });
-    } catch (aiError) {
-      console.error("AI model error:", aiError);
-      // Return mock response
-      return NextResponse.json(getMockResponse('answer-question'));
-    }
-  } catch (error) {
-    console.error('Error answering question:', error);
-    return NextResponse.json(getMockResponse('answer-question'));
   }
 } 

@@ -1,309 +1,259 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 
-// Initialize Google Generative AI
+// Initialize Google Generative AI with proper error handling
 let genAI: GoogleGenerativeAI | null = null;
+let geminiModel: GenerativeModel | null = null;
 let initialized = false;
 
 try {
-  const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_KEY || '';
-  if (apiKey) {
+  const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_KEY || process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY || '';
+  if (apiKey && apiKey.length > 10) {
     genAI = new GoogleGenerativeAI(apiKey);
+    geminiModel = genAI.getGenerativeModel({ model: 'gemini-pro' });
     initialized = true;
-    console.log("AI service initialized successfully");
+    console.log("AI service initialized successfully with API key");
   } else {
-    console.warn("Google AI API key is not set. Some AI features may not work correctly.");
+    console.warn("Google AI API key is missing or invalid. AI features will use mock responses.");
   }
 } catch (error) {
   console.error("Failed to initialize AI service:", error);
 }
 
-interface AIProcessingOptions {
-  maxOutputTokens?: number;
+// Common configuration options for AI requests
+interface AIRequestOptions {
   temperature?: number;
+  maxTokens?: number;
   topK?: number;
   topP?: number;
-  fallback?: boolean;
 }
 
 // Generic function to handle AI requests with proper error handling
-async function processRequest(prompt: string, options: AIProcessingOptions = {}) {
+async function processAIRequest(
+  prompt: string, 
+  options: AIRequestOptions = {},
+  mockResponse?: string
+): Promise<string> {
   const {
-    maxOutputTokens = 1024,
     temperature = 0.7,
+    maxTokens = 1024,
     topK = 40,
-    topP = 0.95,
-    fallback = true
+    topP = 0.95
   } = options;
 
   try {
-    if (!initialized || !genAI) {
-      if (fallback) {
-        console.warn("Using mock response due to uninitialized AI service");
-        return getMockResponse(prompt);
-      }
-      throw new Error("AI service not initialized");
+    if (!initialized || !geminiModel) {
+      console.warn("Using mock response due to uninitialized AI service");
+      return mockResponse || getMockResponse(prompt);
     }
 
-    const geminiModel = genAI.getGenerativeModel({
-      model: 'gemini-pro',
+    const result = await geminiModel.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
-        maxOutputTokens,
         temperature,
+        maxOutputTokens: maxTokens,
         topK,
         topP,
       },
     });
 
-    const result = await geminiModel.generateContent(prompt);
+    if (!result.response || !result.response.text) {
+      throw new Error("Empty response from AI service");
+    }
+
     return result.response.text();
   } catch (error) {
     console.error("AI service error:", error);
-    
-    if (fallback) {
-      console.warn("Using mock response due to AI service error");
-      return getMockResponse(prompt);
-    }
-    
-    throw new Error("Failed to process AI request");
+    return mockResponse || getMockResponse(prompt);
   }
 }
 
-// Generate a mock response for testing or when AI service is unavailable
-function getMockResponse(prompt: string): string {
-  // Extract the operation from the prompt (basic heuristic)
-  if (prompt.includes("summarize") || prompt.includes("summary")) {
-    return "This is a mock summary of the content. The AI service is currently unavailable.";
+// Format note content with improved structure
+export async function formatNote(content: string): Promise<string> {
+  if (!content || content.trim().length < 10) {
+    return "Please provide more content to format.";
   }
-  
-  if (prompt.includes("format") || prompt.includes("formatting")) {
-    return prompt.split("Content:")[1]?.trim() || "Mock formatted content";
-  }
-  
-  if (prompt.includes("title") || prompt.includes("suggest title")) {
-    return "Mock Title: Important Notes";
-  }
-  
-  if (prompt.includes("meeting notes") || prompt.includes("enhance meeting")) {
-    return "Enhanced meeting notes would appear here. The AI service is currently unavailable.";
-  }
-  
-  if (prompt.includes("complete") || prompt.includes("continuation")) {
-    return "... this is a mock continuation of your text. The AI service is currently unavailable.";
-  }
-  
-  if (prompt.includes("related topics") || prompt.includes("suggest topics")) {
-    return JSON.stringify([
-      "Note-Taking Strategies",
-      "Information Management",
-      "Productivity Techniques",
-      "Digital Organization",
-      "Knowledge Systems"
-    ]);
-  }
-  
-  // General fallback
-  return "AI response would appear here. The service is currently unavailable.";
-}
 
-// Format the note with AI
-export async function formatNoteWithAI(content: string): Promise<string> {
   const prompt = `
-    Format the following note content to be well-structured and readable. 
-    Improve formatting but preserve all original information.
+    Format and improve the following note content:
+    - Correct any spelling or grammar errors
+    - Add appropriate headings and subheadings
+    - Organize content into logical sections
+    - Keep the original meaning intact
     
-    Content:
     ${content}
   `;
   
-  return processRequest(prompt);
+  return processAIRequest(prompt, { temperature: 0.3 }, content);
 }
 
-// Generate a summary of the note
+// Generate a note summary
 export async function generateNoteSummary(content: string): Promise<string> {
-  const prompt = `
-    Provide a concise summary of the following note content in 3-5 sentences.
-    Capture the main points and key ideas.
+  if (!content || content.trim().length < 10) {
+    return "Please provide more content to summarize.";
+  }
+
+  const prompt = `Create a concise summary of these notes, highlighting the key points. The summary should be about 3-5 sentences.
     
-    Content:
     ${content}
   `;
   
-  return processRequest(prompt);
+  return processAIRequest(prompt, { temperature: 0.5 }, "This is a summary of your notes highlighting the key points.");
 }
 
-// Suggest titles for the note
+// Suggest titles for a note based on content
 export async function suggestNoteTitle(content: string): Promise<string[]> {
+  if (!content || content.trim().length < 10) {
+    return ["Untitled Note", "New Note", "Note " + new Date().toLocaleDateString()];
+  }
+
   const prompt = `
-    Suggest 3 clear, concise titles for the following note content.
-    Titles should accurately reflect the content's main topic.
-    Return just the titles separated by newlines.
+    Based on the following note content, suggest 3 concise and descriptive titles.
+    Return ONLY the titles separated by newlines.
     
-    Content:
     ${content.substring(0, 1000)}
   `;
   
-  const result = await processRequest(prompt);
-  return result.split('\n').filter(title => title.trim().length > 0);
-}
-
-// Enhance meeting notes
-export async function enhanceMeetingNotes(content: string): Promise<string> {
-  const prompt = `
-    Enhance the following meeting notes by:
-    1. Adding clear headings for different sections
-    2. Highlighting action items
-    3. Organizing information logically
-    4. Formatting for better readability
-    Return the enhanced notes in markdown format.
-    
-    Meeting Notes:
-    ${content}
-  `;
-  
-  return processRequest(prompt);
-}
-
-// Generate completion suggestion
-export async function generateCompletionSuggestion(partialContent: string): Promise<string> {
-  const prompt = `
-    Continue the following text in a coherent and natural way.
-    The continuation should be 2-3 sentences that logically follow from the partial content.
-    
-    Partial content:
-    ${partialContent}
-    
-    Continuation:
-  `;
-  
   try {
-    return await processRequest(prompt);
+    const result = await processAIRequest(prompt, { temperature: 0.7 });
+    return result.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .slice(0, 3);
   } catch (error) {
-    console.error("Error in completion suggestion:", error);
-    throw new Error("Failed to generate completion");
+    console.error("Error suggesting titles:", error);
+    return ["Untitled Note", "New Note", "Note " + new Date().toLocaleDateString()];
   }
 }
 
-// Answer question about note
-export async function answerQuestionAboutNote(content: string, question: string): Promise<string> {
-  const prompt = `
-    Based on the following note content, answer this question:
-    "${question}"
-    
-    If the answer cannot be determined from the content, say so clearly.
-    
-    Note content:
-    ${content.substring(0, 3000)}
-  `;
-  
-  return processRequest(prompt);
-}
+// Enhance meeting notes with structure and action items
+export async function enhanceMeetingNotes(content: string): Promise<string> {
+  if (!content || content.trim().length < 10) {
+    return "Please provide meeting notes to enhance.";
+  }
 
-// Organize note content
-export async function organizeNoteContent(content: string): Promise<string> {
   const prompt = `
-    Organize the following note content into a well-structured format with:
-    - Clear headings and subheadings
-    - Bullet points for lists
-    - Logical grouping of related information
+    Enhance and structure these meeting notes:
+    - Organize into clear sections (Attendees, Discussion, Decisions, Action Items)
+    - Format action items with assignees and due dates if mentioned
+    - Highlight key decisions
     
-    Return the organized content in markdown format.
-    
-    Content:
     ${content}
   `;
   
-  return processRequest(prompt);
+  return processAIRequest(prompt, { temperature: 0.4 }, content);
 }
 
-// Find related topics
-export async function findRelatedTopics(content: string): Promise<string[]> {
+// Generate text completion suggestions
+export async function generateCompletionSuggestion(partialContent: string): Promise<string> {
+  if (!partialContent || partialContent.trim().length < 5) {
+    return "Please provide some text to complete.";
+  }
+
   const prompt = `
-    Based on the following note content, suggest 5 related topics that would be valuable to explore.
-    Return your response as a JSON array of strings with just the topic names.
+    Continue this text naturally:
+    ${partialContent}
     
-    Note content:
-    ${content.substring(0, 2000)}
+    Provide a continuation that matches the style and context (about 2-3 sentences).
+  `;
+  
+  return processAIRequest(prompt, { temperature: 0.8 }, "...");
+}
+
+// Answer questions about a note's content
+export async function answerQuestion(content: string, question: string): Promise<string> {
+  if (!content || content.trim().length < 10) {
+    return "Please provide more note content for me to answer questions about.";
+  }
+
+  if (!question || question.trim().length < 3) {
+    return "Please ask a specific question about your note.";
+  }
+
+  const prompt = `
+    Based on this note content:
+    ${content}
+    
+    Please answer this question:
+    ${question}
+    
+    If the answer cannot be determined from the note content, please say so clearly.
+  `;
+  
+  return processAIRequest(prompt, { temperature: 0.5 }, 
+    "I'd help answer your question based on the note content, but the AI service is currently unavailable.");
+}
+
+// Organize and structure note content
+export async function organizeNoteContent(content: string): Promise<string> {
+  if (!content || content.trim().length < 10) {
+    return "Please provide more content to organize.";
+  }
+
+  const prompt = `
+    Organize the following notes into a well-structured format:
+    - Create logical sections with headings
+    - Group related information together
+    - Use bullet points for lists
+    
+    ${content}
+  `;
+  
+  return processAIRequest(prompt, { temperature: 0.4 }, content);
+}
+
+// Find related topics to note content
+export async function findRelatedTopics(content: string): Promise<string[]> {
+  if (!content || content.trim().length < 10) {
+    return ["Note Taking", "Organization", "Productivity", "Information Management", "Knowledge Base"];
+  }
+
+  const prompt = `
+    Based on this note content, suggest 5 related topics that would be valuable to explore.
+    Return ONLY the topic names, each on a new line.
+    
+    ${content.substring(0, 1500)}
   `;
   
   try {
-    const result = await processRequest(prompt);
-    
-    // Try to parse as JSON
-    try {
-      const jsonMatch = result.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-    } catch (parseError) {
-      console.error("Error parsing JSON from AI response:", parseError);
-    }
-    
-    // Fallback to text processing
-    return result
-      .split('\n')
-      .map(line => line.replace(/^\d+\.\s*/, '').trim())
+    const result = await processAIRequest(prompt, { temperature: 0.7 });
+    return result.split('\n')
+      .map(line => line.replace(/^[0-9\-\.\•]+\s*/, '').trim())
       .filter(line => line.length > 0)
       .slice(0, 5);
   } catch (error) {
     console.error("Error finding related topics:", error);
-    return [
-      "Note Taking Techniques",
-      "Information Management",
-      "Productivity Methods",
-      "Digital Organization",
-      "Knowledge Systems"
-    ];
+    return ["Note Taking", "Organization", "Productivity", "Information Management", "Knowledge Base"];
   }
 }
 
-// Extract key insights from a note
+// Extract key insights from note content
 export async function extractKeyInsights(content: string): Promise<string[]> {
+  if (!content || content.trim().length < 10) {
+    return ["Please provide more content to extract insights from."];
+  }
+
   const prompt = `
-    Extract 3-5 key insights or important points from the following note content.
-    Return each insight as a separate line.
+    Extract 3-5 key insights or main points from this note content.
+    Return ONLY the insights, each on a new line.
     
-    Content:
-    ${content.substring(0, 2500)}
+    ${content}
   `;
   
   try {
-    const result = await processRequest(prompt);
-    return result
-      .split('\n')
-      .map(line => line.replace(/^\d+\.\s*/, '').trim())
-      .filter(line => line.length > 0);
+    const result = await processAIRequest(prompt, { temperature: 0.5 });
+    return result.split('\n')
+      .map(line => line.replace(/^[0-9\-\.\•]+\s*/, '').trim())
+      .filter(line => line.length > 0)
+      .slice(0, 5);
   } catch (error) {
-    console.error("Error extracting key insights:", error);
-    return ["Key insights would appear here. The AI service is currently unavailable."];
+    console.error("Error extracting insights:", error);
+    return ["Key insight 1", "Key insight 2", "Key insight 3"];
   }
 }
 
-// Generate a mind map structure from note content
+// Generate mind map structure from note content
 export async function generateMindMapStructure(content: string): Promise<any> {
-  const prompt = `
-    Create a mind map structure from the following note content.
-    Return the result as a JSON object with a 'root' node and 'children' array.
-    Each node should have a 'text' property and optional 'children' array.
-    Keep it to 3 levels deep maximum with 3-5 main branches.
-    
-    Content:
-    ${content.substring(0, 2000)}
-  `;
-  
-  try {
-    const result = await processRequest(prompt);
-    
-    // Try to extract and parse JSON
-    const jsonMatch = result.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[0]);
-      } catch (parseError) {
-        console.error("Error parsing mind map JSON:", parseError);
-      }
-    }
-    
-    // Fallback structure
+  if (!content || content.trim().length < 10) {
     return {
       root: { text: "Main Topic" },
       children: [
@@ -312,55 +262,121 @@ export async function generateMindMapStructure(content: string): Promise<any> {
         { text: "Subtopic 3", children: [{ text: "Detail 1" }, { text: "Detail 2" }] }
       ]
     };
+  }
+
+  const prompt = `
+    Create a mind map structure from this note content with:
+    - A central topic (main theme of the notes)
+    - 3-5 main branches (key topics)
+    - 2-3 sub-branches for each main branch
+    
+    Return as a JSON structure with this format:
+    {
+      "root": { "text": "Central Topic" },
+      "children": [
+        { 
+          "text": "Main Branch 1", 
+          "children": [
+            { "text": "Sub-branch 1" },
+            { "text": "Sub-branch 2" }
+          ]
+        }
+      ]
+    }
+    
+    ${content.substring(0, 1500)}
+  `;
+  
+  try {
+    const result = await processAIRequest(prompt, { temperature: 0.6 });
+    const jsonMatch = result.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    throw new Error("No valid JSON found in response");
   } catch (error) {
     console.error("Error generating mind map:", error);
-    
-    // Simplified fallback
     return {
       root: { text: "Main Topic" },
       children: [
-        { text: "Subtopic 1" },
-        { text: "Subtopic 2" },
-        { text: "Subtopic 3" }
+        { text: "Subtopic 1", children: [{ text: "Detail 1" }, { text: "Detail 2" }] },
+        { text: "Subtopic 2", children: [{ text: "Detail 1" }, { text: "Detail 2" }] },
+        { text: "Subtopic 3", children: [{ text: "Detail 1" }, { text: "Detail 2" }] }
       ]
     };
   }
 }
 
 // Generate flashcards from note content
-export async function generateFlashcards(content: string): Promise<{ question: string, answer: string }[]> {
+export async function generateFlashcards(content: string): Promise<any[]> {
+  if (!content || content.trim().length < 10) {
+    return [
+      { question: "Sample Question 1", answer: "Sample Answer 1" },
+      { question: "Sample Question 2", answer: "Sample Answer 2" },
+      { question: "Sample Question 3", answer: "Sample Answer 3" }
+    ];
+  }
+
   const prompt = `
-    Create 5 flashcards from the following note content.
-    Each flashcard should have a question and answer.
-    Return the result as a JSON array where each item has 'question' and 'answer' properties.
+    Create 5 flashcards based on this note content. Each flashcard should have a question and answer.
+    Return as a JSON array with this format:
+    [
+      { "question": "Question text here", "answer": "Answer text here" }
+    ]
     
-    Content:
-    ${content.substring(0, 2500)}
+    ${content.substring(0, 2000)}
   `;
   
   try {
-    const result = await processRequest(prompt);
-    
-    // Try to extract and parse JSON
+    const result = await processAIRequest(prompt, { temperature: 0.6 });
     const jsonMatch = result.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[0]);
-      } catch (parseError) {
-        console.error("Error parsing flashcards JSON:", parseError);
-      }
+      return JSON.parse(jsonMatch[0]);
     }
-    
-    // Fallback flashcards
-    return [
-      { question: "What is the main topic of these notes?", answer: "Refer to the content for specific details" },
-      { question: "What are the key points mentioned?", answer: "Refer to the content for specific details" },
-      { question: "What conclusions can be drawn from this information?", answer: "Refer to the content for specific details" }
-    ];
+    throw new Error("No valid JSON found in response");
   } catch (error) {
     console.error("Error generating flashcards:", error);
     return [
-      { question: "AI-generated flashcards would appear here", answer: "The service is currently unavailable" }
+      { question: "Sample Question 1", answer: "Sample Answer 1" },
+      { question: "Sample Question 2", answer: "Sample Answer 2" },
+      { question: "Sample Question 3", answer: "Sample Answer 3" }
     ];
   }
+}
+
+// Generate a mock response when AI is unavailable
+function getMockResponse(prompt: string): string {
+  if (prompt.includes('format') || prompt.includes('improve')) {
+    return "I would format and improve your note here, but the AI service is currently unavailable.";
+  }
+  
+  if (prompt.includes('summarize')) {
+    return "This would be a concise summary of your notes, highlighting the key points and important information.";
+  }
+  
+  if (prompt.includes('suggest title')) {
+    return "Untitled Note\nNote Summary\nImportant Information";
+  }
+  
+  if (prompt.includes('meeting')) {
+    return "## Meeting Notes\n\n### Attendees\n- Person 1\n- Person 2\n\n### Discussion\nMain discussion points would be listed here.\n\n### Action Items\n- Task 1\n- Task 2";
+  }
+  
+  if (prompt.includes('complete')) {
+    return "... here's how the text would continue naturally based on your content.";
+  }
+  
+  if (prompt.includes('question')) {
+    return "I'd help answer your question based on the note content, but the AI service is currently unavailable.";
+  }
+  
+  if (prompt.includes('related topics')) {
+    return "Topic 1\nTopic 2\nTopic 3\nTopic 4\nTopic 5";
+  }
+  
+  if (prompt.includes('insights')) {
+    return "Key insight 1\nKey insight 2\nKey insight 3";
+  }
+  
+  return "AI response would appear here. The service is currently unavailable.";
 } 
